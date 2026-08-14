@@ -1,0 +1,20 @@
+{
+  "name": "portals",
+  "interface": {
+    "displayName": "Portals Plugins",
+    "description": "Codex plugin for building browser games on Portals."
+  },
+  "plugins": [
+    {
+      "name": "portals-plugin-openai",
+      "source": {
+        "source": "local",
+        "path": "./plugins/portals-plugin-openai"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

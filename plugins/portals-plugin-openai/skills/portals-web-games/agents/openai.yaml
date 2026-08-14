@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Web Games"
+  short_description: "Build and publish browser games on Portals"
+  default_prompt: "Use $portals-web-games to create and publish a browser game on Portals."

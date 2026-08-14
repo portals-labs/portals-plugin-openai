@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Guardian Avatars"
+  short_description: "Player avatars, wearables, and a character controller in Three.js"
+  default_prompt: "Use $portals-guardian-avatars to put the player's Guardian avatar in my Three.js game."

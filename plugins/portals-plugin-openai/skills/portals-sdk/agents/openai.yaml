@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals SDK"
+  short_description: "Identity, saves, and leaderboards for Portals games"
+  default_prompt: "Use $portals-sdk to add Portals sign-in, saved progress, and a leaderboard to my game."

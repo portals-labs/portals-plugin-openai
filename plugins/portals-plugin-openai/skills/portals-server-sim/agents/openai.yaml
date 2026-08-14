@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Server-Simulated Games"
+  short_description: "Server-authoritative real-time simulation with snapshots and prediction"
+  default_prompt: "Use $portals-server-sim to run my game's physics on the server with client prediction and a host fallback."

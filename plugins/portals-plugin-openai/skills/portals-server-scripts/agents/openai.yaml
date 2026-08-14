@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Server Scripts"
+  short_description: "Authoritative server-side game logic with server.js"
+  default_prompt: "Use $portals-server-scripts to add a lobby with ready checks and a countdown to my game."

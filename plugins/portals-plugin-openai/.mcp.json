@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "portals-web-games": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp/server.cjs"],
+      "cwd": "."
+    }
+  }
+}

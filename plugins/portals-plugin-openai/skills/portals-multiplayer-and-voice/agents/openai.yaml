@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Multiplayer & Voice"
+  short_description: "Real-time multiplayer, chat, and voice for Portals games"
+  default_prompt: "Use $portals-multiplayer-and-voice to add real-time multiplayer and voice chat to my game."
