@@ -32535,6 +32535,84 @@ function hasFailed(status) {
   return status === "failed" || status === "canceled" || status === "cancelled";
 }
 
+// src/avatar-client.ts
+function toAbsoluteUrl2(url2) {
+  if (typeof url2 !== "string" || !url2) return "";
+  return url2.startsWith("/") ? `${API_BASE}${url2}` : url2;
+}
+function asString2(value) {
+  return typeof value === "string" ? value : "";
+}
+function asStringArray2(value) {
+  return Array.isArray(value) ? value.filter((v) => typeof v === "string" && v.length > 0) : [];
+}
+function toWearable(raw) {
+  return {
+    id: asString2(raw.id),
+    shopItemId: asString2(raw.shopItemId),
+    name: asString2(raw.name),
+    category: asString2(raw.category),
+    slots: asStringArray2(raw.slots),
+    equipped: raw.equipped === true,
+    removesHair: raw.removesHair === true,
+    glb: asString2(raw.glb),
+    downloadUrl: toAbsoluteUrl2(raw.downloadUrl),
+    thumbnailUrl: toAbsoluteUrl2(raw.thumbnailUrl)
+  };
+}
+async function listAvatarWearables() {
+  const path = "/api/v2/arcade/avatar-wearables";
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    headers: { "x-access-key": getAccessKey() }
+  });
+  const raw = await res.text();
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    throw new Error(
+      `${path} returned a non-JSON response (HTTP ${res.status}): ${raw.slice(0, 200)}`
+    );
+  }
+  if (!res.ok || payload?.code !== "SUCCESS") {
+    const code = payload?.code ?? `HTTP_${res.status}`;
+    throw new Error(`${path} failed (${code}).`);
+  }
+  const config2 = payload.data?.config ?? {};
+  const costume = payload.data?.customAvatar;
+  return {
+    body: {
+      bodyType: asString2(config2.bodyType) || "male",
+      skinColor: asString2(config2.skinColor),
+      hairColor: asString2(config2.hairColor),
+      hairStyle: asString2(config2.hairStyle)
+    },
+    customAvatar: costume ? {
+      id: asString2(costume.id),
+      shopItemId: asString2(costume.shopItemId),
+      name: asString2(costume.name),
+      glb: asString2(costume.glb),
+      downloadUrl: toAbsoluteUrl2(costume.downloadUrl),
+      thumbnailUrl: toAbsoluteUrl2(costume.thumbnailUrl)
+    } : null,
+    wearables: (payload.data?.wearables ?? []).map(toWearable)
+  };
+}
+function findAvatarItem(wardrobe, itemId) {
+  const needle = itemId.trim();
+  const all = [
+    ...wardrobe.wearables,
+    ...wardrobe.customAvatar ? [wardrobe.customAvatar] : []
+  ];
+  const byId = all.find((item) => item.id === needle || item.shopItemId === needle);
+  if (byId) return { item: byId, ambiguous: false };
+  const named = all.filter((item) => item.name.toLowerCase() === needle.toLowerCase());
+  if (named.length === 1) return { item: named[0], ambiguous: false };
+  if (named.length > 1) return { item: null, ambiguous: named.map((item) => item.id) };
+  return { item: null, ambiguous: [] };
+}
+
 // src/tools.ts
 function toErrorMessage(error51) {
   if (error51 instanceof Error) {
@@ -34608,6 +34686,162 @@ ${htmlSnippet}`,
       }
     }
   );
+  const describeAvatarWearable = (item) => ({
+    id: item.id,
+    shop_item_id: item.shopItemId,
+    name: item.name,
+    category: item.category,
+    slots: item.slots,
+    equipped: item.equipped,
+    removes_hair: item.removesHair,
+    download_url: item.downloadUrl,
+    source_glb_url: item.glb,
+    thumbnail_url: item.thumbnailUrl
+  });
+  server2.registerTool(
+    "list_avatar_wearables",
+    {
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+        destructiveHint: false
+      },
+      description: "List the Guardian wearables this account owns \u2014 hats, glasses, tops, full-body costumes \u2014 each marked with whether the avatar is wearing it, plus the saved body type, skin, hair and any full avatar worn in place of the Guardian. Use it when a game renders the player's own Guardian and an item has to be reproduced locally: the item that breaks an animation, hides the wrong mesh, or sits wrong on the rig is the player's own, and nothing else can name it. Each item carries a download_url \u2014 pass it to save_avatar_wearable to write the GLB into the game's directory.",
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const wardrobe = await listAvatarWearables();
+        const worn = wardrobe.wearables.filter((item) => item.equipped);
+        return successResult(
+          "list_avatar_wearables",
+          wardrobe.wearables.length === 0 ? "This account owns no Guardian wearables." : `${wardrobe.wearables.length} owned wearable${wardrobe.wearables.length === 1 ? "" : "s"}, ${worn.length} currently worn.`,
+          {
+            body: wardrobe.body,
+            custom_avatar: wardrobe.customAvatar ? {
+              id: wardrobe.customAvatar.id,
+              shop_item_id: wardrobe.customAvatar.shopItemId,
+              name: wardrobe.customAvatar.name,
+              download_url: wardrobe.customAvatar.downloadUrl,
+              source_glb_url: wardrobe.customAvatar.glb
+            } : null,
+            count: wardrobe.wearables.length,
+            equipped_count: worn.length,
+            items: wardrobe.wearables.map(describeAvatarWearable)
+          },
+          wardrobe.wearables.length === 0 ? [
+            "Buy or claim wearables at https://portals.to/shop, then dress the Guardian at https://portals.to/avatar."
+          ] : [
+            "Pass an item's id or name to save_avatar_wearable with an outputPath inside the game's directory to fetch its GLB.",
+            ...wardrobe.customAvatar ? [
+              "This avatar is wearing a full-body custom avatar, which replaces the Guardian body \u2014 a game rendering it will not show the wearables above."
+            ] : []
+          ]
+        );
+      } catch (error51) {
+        return errorResult(
+          "list_avatar_wearables",
+          "LIST_AVATAR_WEARABLES_FAILED",
+          toErrorMessage(error51),
+          "The account's wearables could not be read.",
+          [
+            "Confirm the MCP is authenticated (call authenticate).",
+            "The wearables belong to the authenticated account \u2014 there is no way to read another player's."
+          ]
+        );
+      }
+    }
+  );
+  server2.registerTool(
+    "save_avatar_wearable",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        // overwrite:true replaces a local file, same as save_generated_asset.
+        destructiveHint: true
+      },
+      description: "Download one of this account's Guardian wearables as a GLB into the game's directory, so it can be loaded and inspected the way the game will see it. Name the item by its id, its shop item id, or its exact name from list_avatar_wearables. The file comes through the same per-item proxy a hosted game loads wearables from, resolved for the avatar's saved body type.",
+      inputSchema: {
+        itemId: external_exports.string().describe(
+          "The wearable to fetch \u2014 its id, its shop_item_id, or its exact name as listed by list_avatar_wearables."
+        ),
+        outputPath: external_exports.string().describe(
+          "Where to write the GLB, inside the game's directory (for example ./mygame/assets/sunglasses.glb). A directory or an extensionless path is named from the item."
+        ),
+        overwrite: external_exports.boolean().optional().describe("Replace the file if it already exists. Defaults to false.")
+      }
+    },
+    async ({ itemId, outputPath, overwrite }) => {
+      try {
+        if (!itemId?.trim()) {
+          return errorResult(
+            "save_avatar_wearable",
+            "ITEM_ID_REQUIRED",
+            "itemId is required.",
+            "Nothing was downloaded.",
+            ["Call list_avatar_wearables to find the item's id or name."]
+          );
+        }
+        const wardrobe = await listAvatarWearables();
+        const found = findAvatarItem(wardrobe, itemId);
+        if (!found.item) {
+          return errorResult(
+            "save_avatar_wearable",
+            found.ambiguous.length > 0 ? "ITEM_AMBIGUOUS" : "ITEM_NOT_FOUND",
+            found.ambiguous.length > 0 ? `This account owns ${found.ambiguous.length} wearables called "${itemId}".` : `This account owns no wearable matching "${itemId}".`,
+            "Nothing was downloaded.",
+            found.ambiguous.length > 0 ? [`Name one of them by id: ${found.ambiguous.join(", ")}.`] : ["Call list_avatar_wearables and use an id or an exact name from it."],
+            { item_id: itemId }
+          );
+        }
+        const item = found.item;
+        if (!item.downloadUrl) {
+          return errorResult(
+            "save_avatar_wearable",
+            "ITEM_NOT_DOWNLOADABLE",
+            `"${item.name}" has no shop item behind it, so the item proxy cannot serve it.`,
+            "Nothing was downloaded.",
+            ["Its creator-hosted URL is in list_avatar_wearables as source_glb_url; fetch that yourself if it is reachable."],
+            { item_id: itemId }
+          );
+        }
+        const target = await resolveGeneratedAssetTarget({
+          outputPath,
+          suggestedName: item.name,
+          // The proxy addresses items by id, so its URL carries no extension.
+          fallbackExtension: ".glb"
+        });
+        const saved = await saveGeneratedAsset(item.downloadUrl, target, { overwrite });
+        return successResult(
+          "save_avatar_wearable",
+          `Saved "${item.name}" \u2014 ${saved.bytes} bytes to ${saved.absolutePath}.`,
+          {
+            local_path: saved.absolutePath,
+            bytes: saved.bytes,
+            item: "slots" in item ? describeAvatarWearable(item) : { id: item.id, name: item.name, custom_avatar: true },
+            body_type: wardrobe.body.bodyType
+          },
+          [
+            "Equip it in a Guardian scene the way the game does \u2014 avatar.wearables.registerCatalog + equip \u2014 to reproduce what the player sees."
+          ]
+        );
+      } catch (error51) {
+        return errorResult(
+          "save_avatar_wearable",
+          "SAVE_AVATAR_WEARABLE_FAILED",
+          toErrorMessage(error51),
+          "The wearable was not saved.",
+          [
+            "Confirm the MCP is authenticated (call authenticate).",
+            "Pick an outputPath inside the game's directory, ending in .glb.",
+            "Pass overwrite=true to replace a file that is already there."
+          ],
+          { item_id: itemId, output_path: outputPath }
+        );
+      }
+    }
+  );
 }
 
 // src/instructions.ts
@@ -34875,7 +35109,7 @@ Full docs: https://portals.to/documentation/advanced-tooling/portals-sdk, https:
 var server = new McpServer(
   {
     name: "portals-web-games",
-    version: "0.1.1",
+    version: "0.1.2",
     description: "MCP server for Portals web games \u2014 create browser game projects, push local source to them, and pull their source back down."
   },
   { instructions: SERVER_INSTRUCTIONS }

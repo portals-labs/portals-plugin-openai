@@ -1,6 +1,6 @@
 {
   "name": "portals-plugin-openai",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Build, manage, and publish Portals browser games from Codex.",
   "author": {
     "name": "Portals",

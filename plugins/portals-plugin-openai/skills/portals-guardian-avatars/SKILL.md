@@ -43,6 +43,13 @@ Module-based games can skip the loader and `import { PortalsAvatars } from '@por
 - Animation: `avatar.animations.load([...])` retargets clips onto the Guardian rig, including foreign Mixamo-rigged clips. The controller drives locomotion itself — return `true` from `controller.onBeforeAnimationUpdate` to take over for a frame. Faces are a separate layer: `avatar.face.setEmotion`, `setTalking`, `setAutoBlink`.
 - Controller: WASD, sprint, jump, crouch, first/third-person camera. `configureMovement` values are clamped to `MOVEMENT_LIMITS`.
 
+## Reproduce the player's own items
+
+A game that renders the signed-in player's Guardian inherits whatever that account owns and wears, so an item that breaks an animation or hides the wrong mesh is only debuggable with the real GLB in hand. Two `portals-web-games` MCP tools read the authenticated account's wardrobe — there is no route to another player's:
+
+- `list_avatar_wearables` names the owned items, marks the ones currently worn, and reports the saved body type, skin, and hair. It also reports a full-body custom avatar when one is worn: that replaces the Guardian body, so a game rendering it will not show the wearables at all.
+- `save_avatar_wearable` writes one item's GLB into the game's directory, fetched through the same per-item proxy a hosted game loads it from and resolved for the avatar's body type. Equip the saved file with `registerCatalog` + `equip` to see what the player sees.
+
 ## Related
 
 - Identity, saves, and leaderboards: the `portals-sdk` skill.
