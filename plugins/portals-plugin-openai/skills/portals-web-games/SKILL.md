@@ -36,6 +36,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 3. Implement and test the game using the bundled platform rules.
 4. Call `push_web_game_source` with the local game directory. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing.
 5. Use `update_web_game_settings` for publishing metadata and media. Report any remaining publishing requirements returned by the tool.
+6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`.
 
 ### Settings-only or discovery task
 
@@ -70,4 +71,5 @@ Generated assets spend account credits and cannot be undone. Generate only when 
 
 - Run the project's relevant local checks before pushing when they are available.
 - Summarize the game ID, local directory, resulting revision, and editor/share/play URLs returned by the tools. `get_web_game_share_link` re-fetches the shareable draft link when it is needed outside a push.
-- Distinguish a successful source push from publication; publishing may still require settings or an action in the Portals editor.
+- Distinguish a successful source push from publication. A push only updates the private draft; `publish_web_game` is what releases the build to players and lists the game.
+- Treat publishing as an explicit user decision — never publish to finish a build task. It is capped at 10 per day, it replaces what live players get, and this MCP cannot unpublish. When `publish_web_game` returns a checklist of missing metadata, fill it with `update_web_game_settings` and report what changed before retrying.

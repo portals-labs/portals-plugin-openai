@@ -1,6 +1,6 @@
 ---
 name: portals-multiplayer-and-voice
-description: Add real-time multiplayer, in-game text chat, and voice chat to a hosted Portals web game with Portals.net and Portals.voice. Use when working with net.join, sessions and channels, global channels, net.send broadcasts, shared state, playerjoin/playerleave events, rate limits, disconnect handling, voice.join, mute, mic pickers, speaking indicators, or testing multiplayer locally with a dev token.
+description: Add real-time multiplayer, in-game text chat, and voice chat to a hosted Portals web game with Portals.net and Portals.voice. Use when working with net.join, sessions and channels, global channels, net.send broadcasts, shared state, playerjoin/playerleave events, rate limits, disconnect handling, voice.join, mute, mic pickers, speaking indicators, region- or zone-scoped voice channels, or testing multiplayer locally with a dev token.
 ---
 
 # Portals multiplayer, chat, and voice
@@ -35,6 +35,42 @@ Both transports ship with the SDK the project already includes:
 - A rejection must leave the game fully playable. Show a small "voice off — turn on" control that retries.
 - Always render an easy-to-reach mute button. Device labels are empty until mic permission is granted, and `devices()` returns a snapshot — re-call it when the picker opens so a mid-game headset appears.
 - Put voice UI in HTML overlays, not canvas rendering, so it stays clickable and accessible.
+
+## Region-based voice
+
+By default the whole session is one voice room. In a game with distinct places — zones, floors, team bases, vehicles, tables — scope voice to the place the player is in by passing a channel to `voice.join()`, so players only hear the people they are standing with:
+
+```js
+let wantedChannel = null;
+let mutePreference = false;
+
+async function joinVoiceRegion(regionId) {
+  // letters, digits, ":", "_", "-"; starts alphanumeric; max 64 chars
+  const channel = "region-" + regionId;
+  if (channel === wantedChannel) return;
+  wantedChannel = channel;
+  showVoiceRegion(regionId, "connecting");
+  try {
+    await voice.leave();                    // harmless before the first join
+    const session = await voice.join({ channel });
+    if (wantedChannel !== channel) return;  // the player moved again — a newer join owns the UI
+    voice.setMuted(mutePreference);         // mute is per session, so re-apply the player's choice
+    renderVoiceRoster(session.participants);
+    showVoiceRegion(regionId, "connected");
+  } catch (error) {
+    showVoiceOffControl();                  // keep the game fully playable
+  }
+}
+```
+
+- A voice channel is a sub-lobby *inside* the session the host already put the player in — it partitions people who could hear each other anyway, and never reaches another session. Region voice is orthogonal to the geographic regions of `net` sessions.
+- Switching tears down and rebuilds the connection, so the player hears nobody for a moment. Debounce crossings: require ~1 s inside the new region (or an overlap band between regions) before switching, and never drive it from a per-frame position check. Always keep the "newer switch wins" guard above, or a fast walk through three rooms leaves the roster showing the wrong one.
+- Derive the channel from a region id both clients compute identically, and sanitize it to the channel charset. Keep the region set small and named — discrete places, not a grid cell per few metres.
+- There is no per-participant volume or spatialization: continuous distance falloff is not possible, discrete regions are the approximation.
+- Re-render the roster and clear speaking highlights on every switch — `participants()` and `speaking` ids only ever cover the current channel.
+- Who is where is *game* state: put region membership in `net` shared state or broadcasts. The voice roster is not a substitute — players who declined the mic never appear in it.
+- Never re-join or leave `net` when the voice region changes; that would reset the roster and shared state. The two transports move independently.
+- Consent is asked once and later re-joins reuse it, but a re-join can still fail. On failure show the "voice off — turn on" retry and leave the player in the game.
 
 ## Availability
 

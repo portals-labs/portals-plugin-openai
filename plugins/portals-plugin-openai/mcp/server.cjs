@@ -31630,6 +31630,8 @@ function clearCredentials() {
 }
 
 // src/arcade-client.ts
+var import_node_crypto = require("node:crypto");
+var ARCADE_EDITOR_DRAFT_ID = "editor";
 function toWebGameSummary(game) {
   return {
     gameId: game.gameId,
@@ -31796,6 +31798,36 @@ async function createShareLink(gameId) {
     { method: "POST", body: { gameId } }
   );
   return shareUrl.startsWith("/") ? `${API_BASE}${shareUrl}` : shareUrl;
+}
+var publishAttempts = /* @__PURE__ */ new Map();
+async function publishWebGame(gameId, expectedRevision) {
+  const attemptKey = `${gameId}:${expectedRevision ?? ""}`;
+  let operationId = publishAttempts.get(attemptKey);
+  if (!operationId) {
+    operationId = (0, import_node_crypto.randomUUID)();
+    publishAttempts.set(attemptKey, operationId);
+  }
+  const data = await arcadeRequest("/api/v2/arcade/publish-draft", {
+    method: "POST",
+    body: {
+      gameId,
+      // The editor project is the published source: a push adopts into it, so
+      // an upload draft is never what players receive.
+      draftId: ARCADE_EDITOR_DRAFT_ID,
+      operationId,
+      ...expectedRevision ? { sourceRevision: expectedRevision } : {}
+    }
+  });
+  publishAttempts.delete(attemptKey);
+  return {
+    version: data.version,
+    publishedVersion: data.publishedVersion,
+    becameLive: data.becameLive === true,
+    slug: data.slug,
+    playUrl: data.playerUrl.startsWith("/") ? `${API_BASE}${data.playerUrl}` : data.playerUrl,
+    isListed: data.isListed === true,
+    cacheReady: data.cacheReady !== false
+  };
 }
 async function createDevToken(gameId) {
   const data = await arcadeRequest(
@@ -32978,7 +33010,7 @@ function registerTools(server2) {
               "The shareable link could not be minted this time \u2014 call get_web_game_share_link to get a URL others can play the pushed draft at."
             ],
             `Open ${editorUrl(targetGameId)} to run and edit the pushed code.`,
-            `Publish it to players from that editor \u2014 publishing needs a description, genre, device support, and age rating (update_web_game_settings sets them, plus the featured image and game link).`,
+            `When the build is ready for players, call publish_web_game \u2014 publishing needs a description, genre, device support, age rating, and a featured image (update_web_game_settings sets them all).`,
             ...usesMultiplayer ? [] : [
               "This build doesn't use Portals.net yet. Games on Portals do better with a multiplayer touch \u2014 even live presence, a shared score race, or in-game chat is a few lines with Portals.net (see the server instructions). Suggest one that fits this game and offer to add it."
             ],
@@ -33156,7 +33188,7 @@ function registerTools(server2) {
           [
             `Share ${shareUrl} with anyone \u2014 it plays the game's latest draft in the browser, no Portals publish or sign-in needed.`,
             "The link keeps serving the newest draft: after another push, the same URL plays the new build.",
-            "Publishing to the public game page (portals.to/g/<slug>) stays a deliberate step in the Portals editor."
+            "Publishing to the public game page (portals.to/g/<slug>) stays a separate, deliberate step \u2014 call publish_web_game when players should get this build."
           ]
         );
       } catch (error51) {
@@ -33379,7 +33411,7 @@ function registerTools(server2) {
           },
           [
             ...slug !== void 0 && updated ? [`The game's link is now ${playUrl(updated.slug)}; previous links keep working as aliases.`] : [],
-            ...accessMode !== void 0 || priceCents !== void 0 ? ["Pricing is stamped to the live game at publish \u2014 publish from the editor for players to see it."] : [],
+            ...accessMode !== void 0 || priceCents !== void 0 ? ["Pricing is stamped to the live game at publish \u2014 call publish_web_game for players to see it."] : [],
             ...updated?.status === "live" ? ["Metadata edits on a live game re-run the automated listing review; the public listing may take a moment to reflect them."] : []
           ]
         );
@@ -33397,6 +33429,77 @@ function registerTools(server2) {
             "On PROJECT_BUSY, the project is being edited elsewhere \u2014 retry shortly."
           ],
           { game_id: rawGameId }
+        );
+      }
+    }
+  );
+  server2.registerTool(
+    "publish_web_game",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: true,
+        destructiveHint: true
+      },
+      description: "Publish a web game: release its current source as a new immutable version, make that version the one players get at portals.to/g/<slug>, and list it on Portals for discovery. This is the public release \u2014 everything before it (push_web_game_source, the share link) only ever touched the private draft. It publishes what the last push adopted, so push first and confirm the build plays. Portals requires a complete listing before it will publish: description, genre, device support, age rating, and an uploaded featured image (update_web_game_settings sets all of them); a missing field comes back as a checklist, not a partial publish. Publishing again later ships a new version over the live one. Capped at 10 publishes per day.",
+      inputSchema: {
+        gameId: external_exports.string().describe("Web game to publish (from list_web_games)."),
+        expectedRevision: external_exports.string().optional().describe(
+          "Project revision this publish is meant to ship (the `revision` a push or pull returned). The publish fails instead of releasing source that changed after it \u2014 pass it whenever the revision is known."
+        )
+      }
+    },
+    async ({ gameId: rawGameId, expectedRevision }) => {
+      try {
+        const gameId = rawGameId?.trim();
+        if (!gameId) {
+          return errorResult(
+            "publish_web_game",
+            "GAME_ID_REQUIRED",
+            "gameId is required.",
+            "Nothing was published.",
+            ["Call list_web_games to find the gameId."]
+          );
+        }
+        const published = await publishWebGame(gameId, expectedRevision?.trim() || void 0);
+        return successResult(
+          "publish_web_game",
+          published.becameLive ? `Published web game ${gameId} as version ${published.publishedVersion} \u2014 live at ${published.playUrl}.` : `Version ${published.publishedVersion} of web game ${gameId} was released, but version ${published.version} is what players get.`,
+          {
+            game_id: gameId,
+            slug: published.slug,
+            play_url: published.playUrl,
+            version: published.version,
+            published_version: published.publishedVersion,
+            became_live: published.becameLive,
+            is_listed: published.isListed,
+            cache_ready: published.cacheReady,
+            editor_url: editorUrl(gameId)
+          },
+          [
+            `Anyone can play it at ${published.playUrl} \u2014 no share link and no sign-in needed.`,
+            ...published.isListed ? ["It is listed on Portals, so players can find it through browse and search."] : [
+              "It is not listed for discovery yet: the automated listing review has to approve this version first. The play link works the whole time; check back with list_web_games."
+            ],
+            ...published.cacheReady ? [] : ["Portals is still finishing this version's CDN cache metadata in the background \u2014 the game is already playable."],
+            "Later pushes go to the private draft again; publish once more when the next version should reach players."
+          ]
+        );
+      } catch (error51) {
+        return errorResult(
+          "publish_web_game",
+          "PUBLISH_WEB_GAME_FAILED",
+          toErrorMessage(error51),
+          "Failed to publish the web game.",
+          [
+            "On INVALID_METADATA, the message lists the missing publish checklist fields \u2014 set them with update_web_game_settings (description, genre, deviceSupport, ageRating, featuredImagePath) and publish again.",
+            "On DRAFT_NOT_PROCESSED, the project has no build to publish \u2014 push one with push_web_game_source first.",
+            "On PUBLISH_OPERATION_CONFLICT, the source changed after the revision passed as expectedRevision \u2014 verify the current build, then publish again with the revision the latest push returned.",
+            "On RATE_LIMITED, this account hit its 10 publishes per day \u2014 retry tomorrow.",
+            "On PROJECT_ARCHIVED, unarchive the game in My Games first.",
+            "Paid games additionally need a payout-ready Stripe account connected in Monetization settings."
+          ],
+          { game_id: rawGameId, ...expectedRevision ? { expected_revision: expectedRevision } : {} }
         );
       }
     }
@@ -35109,7 +35212,7 @@ Full docs: https://portals.to/documentation/advanced-tooling/portals-sdk, https:
 var server = new McpServer(
   {
     name: "portals-web-games",
-    version: "0.1.2",
+    version: "0.1.3",
     description: "MCP server for Portals web games \u2014 create browser game projects, push local source to them, and pull their source back down."
   },
   { instructions: SERVER_INSTRUCTIONS }
