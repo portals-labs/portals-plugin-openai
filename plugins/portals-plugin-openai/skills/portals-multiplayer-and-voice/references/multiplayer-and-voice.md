@@ -32,6 +32,24 @@ await net.join({ channel: "global:match-x7q2" });
 
 A global room runs in one place (the US home region), so distant players see higher latency. Use global channels for lobbies, matchmaking, and chat; keep fast-paced matches on regional channels unless a match deliberately spans regions. Slow-paced games (turn-based, chat-like traffic) are consolidated into one worldwide room automatically — the prefix guarantees it for a channel regardless of pace.
 
+### Forcing a region
+
+`join({ region })` puts the session on Portals' US or EU servers for every player, wherever they are. The only values are `"us"` and `"eu"`:
+
+```js
+// Everyone in this session connects to the EU servers
+await net.join({ region: "eu" });
+
+// A pin combines with a sub-lobby
+await net.join({ channel: "match-x7q2", region: "us" });
+```
+
+A pin outranks everything else that picks a region: the player's own location, the automatic consolidation of slow-paced games, and a `global:` prefix. Three things follow from that:
+
+- **Distant players pay the latency.** Pin when the game needs one known location for everyone — a scheduled event, a persistent world, a region your players share — and leave it off otherwise, since the default already keeps each player near their server.
+- **Every player of a room must pass the same pin.** The pin chooses which room you join, so a game that pins `"eu"` for some players and nothing (or `"us"`) for others splits them into separate rooms. That is also how you run deliberate US and EU rooms of one channel: let the player pick, and treat the two as separate worlds.
+- **A pin never falls back.** If the pinned region cannot take the session, `join()` rejects rather than quietly connecting somewhere else — one more reason for the catch that keeps the game playable solo.
+
 ## Join a multiplayer session
 
 ```js
@@ -300,7 +318,7 @@ What to know:
 
 | Method | Result |
 | --- | --- |
-| `net.join(options?)` | Joins the session; resolves to `{ self, players, state }`. |
+| `net.join(options?)` | Joins the session, optionally with `{ channel, region }`; resolves to `{ self, players, state }`. |
 | `net.leave()` | Leaves the session. |
 | `net.send(data)` | Broadcasts up to 8 KB of JSON to the other players. |
 | `net.setState(key, value)` | Writes shared last-write-wins state for the session. |

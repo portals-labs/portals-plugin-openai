@@ -1,6 +1,6 @@
 ---
 name: portals-multiplayer-and-voice
-description: Add real-time multiplayer, in-game text chat, and voice chat to a hosted Portals web game with Portals.net and Portals.voice. Use when working with net.join, sessions and channels, global channels, net.send broadcasts, shared state, playerjoin/playerleave events, rate limits, disconnect handling, voice.join, mute, mic pickers, speaking indicators, region- or zone-scoped voice channels, or testing multiplayer locally with a dev token.
+description: Add real-time multiplayer, in-game text chat, and voice chat to a hosted Portals web game with Portals.net and Portals.voice. Use when working with net.join, sessions and channels, global channels, forcing or pinning a session to the US or EU servers, net.send broadcasts, shared state, playerjoin/playerleave events, rate limits, disconnect handling, voice.join, mute, mic pickers, speaking indicators, region- or zone-scoped voice channels, or testing multiplayer locally with a dev token.
 ---
 
 # Portals multiplayer, chat, and voice
@@ -20,6 +20,7 @@ Both transports ship with the SDK the project already includes:
 
 - A session is everyone in the same bucket — all players of the game page, or the people in one Portals room. `join({ channel })` makes a private sub-lobby: letters, numbers, colons, underscores, hyphens; must start alphanumeric; max 64 characters.
 - Sessions are **regional**. A `global:` channel prefix shares one worldwide room. A match arranged in a global lobby needs a global channel too (`global:match-x7`), or players split back into their own regions and never meet. Global rooms run in the US home region, so keep fast-paced matches regional.
+- `join({ region: "us" | "eu" })` forces the session onto that region's servers for every player and outranks all of the above, including a `global:` prefix. Pin only when the game needs one *known* location (a scheduled event, a persistent world, a region the players share) — distant players pay the latency. Pass the same value for every player of a room: differing pins are different rooms, which is how you would deliberately run separate US and EU worlds. A pin never falls back, so `join()` rejects if that region has no capacity.
 - `join()` resolves to a plain snapshot, not a handle — every method stays on `Portals.net`. Use `net.players()`, `net.self()`, `net.getState()` for live synchronous reads after joining.
 - `send()` does **not** echo to the sender; the `state` event **does** fire for the writer. Apply state changes from the event, not at the call site.
 - Limits: 8 KB JSON per message and per state value, 128-character keys, 64 keys per session. About 20 broadcasts and 10 state writes per player per second — never send per-frame; sample on a 100–150 ms timer and interpolate locally.
