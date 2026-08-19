@@ -31358,6 +31358,7 @@ var StdioServerTransport = class {
 };
 
 // src/tools.ts
+var import_node_crypto2 = require("node:crypto");
 var import_promises3 = require("node:fs/promises");
 var import_node_path4 = require("node:path");
 
@@ -31594,6 +31595,132 @@ function authenticateViaBrowser() {
       settleReject(new Error(`Auth callback server failed: ${message}`));
     });
   });
+}
+
+// src/economy-client.ts
+var ECONOMY_LIMITS = {
+  minProductPriceCoins: 10,
+  maxProductPriceCoins: 5400,
+  maxGrantQuantity: 1e4,
+  maxPurchaseLimitPerPlayer: 1e4,
+  maxActiveProducts: 50,
+  maxLifetimeProducts: 100,
+  maxTitleLength: 80,
+  maxDescriptionLength: 500
+};
+var SKU_PATTERN = /^[a-z][a-z0-9_-]{2,63}$/;
+async function economyRequest(path, init) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: init.method,
+    headers: {
+      "x-access-key": getAccessKey(),
+      ...init.body === void 0 ? {} : { "Content-Type": "application/json" }
+    },
+    ...init.body === void 0 ? {} : { body: JSON.stringify(init.body) }
+  });
+  const raw = await res.text();
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    throw new Error(
+      `${path} returned a non-JSON response (HTTP ${res.status}): ${raw.slice(0, 200)}`
+    );
+  }
+  if (!res.ok || payload?.code !== "SUCCESS") {
+    const code = payload?.code ?? `HTTP_${res.status}`;
+    throw new Error(
+      payload?.message ? `${code}: ${payload.message}` : `${code} (HTTP ${res.status})`
+    );
+  }
+  return init.envelopeKey ? payload[init.envelopeKey] : payload;
+}
+async function getEconomyCatalog(gameId) {
+  return economyRequest(
+    `/api/v2/arcade/economy/catalog?gameId=${encodeURIComponent(gameId)}`,
+    { method: "GET", envelopeKey: "catalog" }
+  );
+}
+async function upsertEconomyProduct(input) {
+  return economyRequest("/api/v2/arcade/economy/catalog", {
+    method: "POST",
+    envelopeKey: "catalog",
+    body: {
+      gameId: input.gameId,
+      action: "upsert",
+      product: input.product,
+      expectedDraftRevision: input.expectedDraftRevision,
+      operationId: input.operationId
+    }
+  });
+}
+async function retireEconomyProduct(input) {
+  return economyRequest("/api/v2/arcade/economy/catalog", {
+    method: "POST",
+    envelopeKey: "catalog",
+    body: {
+      gameId: input.gameId,
+      action: "retire",
+      sku: input.sku,
+      expectedDraftRevision: input.expectedDraftRevision,
+      operationId: input.operationId
+    }
+  });
+}
+async function getEconomySandbox(gameId) {
+  return economyRequest(
+    `/api/v2/arcade/economy/sandbox?gameId=${encodeURIComponent(gameId)}`,
+    { method: "GET", envelopeKey: "sandbox" }
+  );
+}
+async function resetEconomySandbox(input) {
+  return economyRequest("/api/v2/arcade/economy/sandbox", {
+    method: "POST",
+    envelopeKey: "sandbox",
+    body: { gameId: input.gameId, action: "reset", operationId: input.operationId }
+  });
+}
+async function purchaseInEconomySandbox(input) {
+  return economyRequest(
+    "/api/v2/arcade/economy/sandbox",
+    {
+      method: "POST",
+      body: {
+        gameId: input.gameId,
+        action: "purchase",
+        sku: input.sku,
+        scenario: input.scenario,
+        operationId: input.operationId
+      }
+    }
+  );
+}
+async function consumeInEconomySandbox(input) {
+  return economyRequest("/api/v2/arcade/economy/sandbox", {
+    method: "POST",
+    envelopeKey: "sandbox",
+    body: {
+      gameId: input.gameId,
+      action: "consume",
+      sku: input.sku,
+      quantity: input.quantity,
+      operationId: input.operationId
+    }
+  });
+}
+async function refundInEconomySandbox(input) {
+  return economyRequest(
+    "/api/v2/arcade/economy/sandbox",
+    {
+      method: "POST",
+      body: {
+        gameId: input.gameId,
+        action: "refund",
+        receiptId: input.receiptId,
+        operationId: input.operationId
+      }
+    }
+  );
 }
 
 // src/auth-store.ts
@@ -34945,6 +35072,362 @@ ${htmlSnippet}`,
       }
     }
   );
+  server2.registerTool(
+    "get_game_economy_catalog",
+    {
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: false,
+        destructiveHint: false
+      },
+      description: "Read a web game's in-game product catalog \u2014 the SKUs players buy with Coins from inside the game via Portals.economy.purchase(). Returns every drafted product with its price, kind, and status, plus the draft's review status and its `draft_revision`, which update_game_economy_catalog takes as expectedDraftRevision. Call this before writing game code that names a SKU: the SDK can only purchase a SKU that exists in the released catalog, so the catalog is what the code has to match. A game with no catalog yet answers configured=false.",
+      inputSchema: {
+        gameId: external_exports.string().describe("Web game whose catalog to read (from list_web_games).")
+      }
+    },
+    async ({ gameId }) => {
+      try {
+        const catalog = await getEconomyCatalog(gameId);
+        return successResult(
+          "get_game_economy_catalog",
+          describeCatalog(catalog),
+          describeCatalogData(catalog),
+          catalogNextSteps(catalog)
+        );
+      } catch (error51) {
+        return errorResult(
+          "get_game_economy_catalog",
+          "GET_GAME_ECONOMY_CATALOG_FAILED",
+          toErrorMessage(error51),
+          "The game's product catalog could not be read.",
+          [
+            "Confirm the MCP is authenticated (call authenticate).",
+            "Only the game's owner can read its catalog \u2014 a collaborator admin cannot."
+          ],
+          { game_id: gameId }
+        );
+      }
+    }
+  );
+  server2.registerTool(
+    "update_game_economy_catalog",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        // Retiring a SKU is permanent — it can never be re-created for this game.
+        destructiveHint: true
+      },
+      description: "Add, edit, or retire one in-game product in a web game's draft catalog. Products are what Portals.economy.purchase(sku) can sell: a `durable` is owned once (no-ads, a character), a `consumable` grants a stackable quantity the game spends with Portals.economy.consume(). Editing writes to the DRAFT catalog only \u2014 drafted changes reach players after Portals reviews the catalog and the owner publishes the game, so nothing here changes what a live game charges today. Retiring is permanent: the SKU is burned for this game's lifetime and cannot be re-created, because players who bought it keep an entitlement that must keep resolving. Prices are in Coins, 10\u20135,400 per product.",
+      inputSchema: {
+        gameId: external_exports.string().describe("Web game whose catalog to change (from list_web_games)."),
+        action: external_exports.enum(["upsert", "retire"]).describe(
+          "`upsert` creates the SKU or replaces every field of an existing one; `retire` permanently withdraws it from sale."
+        ),
+        sku: external_exports.string().describe(
+          "Stable product id, 3\u201364 characters: lowercase letters, numbers, underscores, or hyphens, starting with a letter (e.g. `extra_lives_5`). This is the string the game passes to Portals.economy.purchase()."
+        ),
+        title: external_exports.string().optional().describe(
+          `Player-facing product name shown in the Portals purchase confirmation. Required for upsert. Up to ${ECONOMY_LIMITS.maxTitleLength} characters.`
+        ),
+        description: external_exports.string().optional().describe(
+          `Player-facing description shown alongside the price. Up to ${ECONOMY_LIMITS.maxDescriptionLength} characters.`
+        ),
+        kind: external_exports.enum(["durable", "consumable"]).optional().describe(
+          "Required for upsert. `durable` is bought once and owned forever (grantQuantity is always 1). `consumable` grants a spendable quantity the game draws down with Portals.economy.consume()."
+        ),
+        coinPrice: external_exports.number().int().optional().describe(
+          `Required for upsert. Price in Coins, ${ECONOMY_LIMITS.minProductPriceCoins}\u2013${ECONOMY_LIMITS.maxProductPriceCoins}.`
+        ),
+        grantQuantity: external_exports.number().int().optional().describe(
+          `How many units one purchase grants. Consumables only, 1\u2013${ECONOMY_LIMITS.maxGrantQuantity}; a durable must be 1. Defaults to 1.`
+        ),
+        purchaseLimitPerPlayer: external_exports.number().int().nullable().optional().describe(
+          `Cap on how many times one player may buy this SKU, 1\u2013${ECONOMY_LIMITS.maxPurchaseLimitPerPlayer}. Omit or pass null for no cap.`
+        ),
+        iconPath: external_exports.string().nullable().optional().describe(
+          "PNG, JPEG, or WebP path to the product icon inside the game's own pushed source (e.g. `assets/lives.png`). Relative \u2014 never a leading slash or `..`. Omit or pass null for no icon."
+        ),
+        expectedDraftRevision: external_exports.number().int().optional().describe(
+          "The draft_revision last read from get_game_economy_catalog. Passing it makes the write fail with DRAFT_CONFLICT instead of overwriting a change someone made in the meantime. Omitted, this tool reads the current revision and writes against it."
+        )
+      }
+    },
+    async ({
+      gameId,
+      action,
+      sku,
+      title,
+      description,
+      kind,
+      coinPrice,
+      grantQuantity,
+      purchaseLimitPerPlayer,
+      iconPath,
+      expectedDraftRevision
+    }) => {
+      try {
+        if (!SKU_PATTERN.test(sku)) {
+          return errorResult(
+            "update_game_economy_catalog",
+            "INVALID_SKU",
+            `"${sku}" is not a valid SKU.`,
+            "The catalog was not changed.",
+            [
+              "Use 3\u201364 lowercase letters, numbers, underscores, or hyphens, starting with a letter \u2014 for example `extra_lives_5`."
+            ],
+            { game_id: gameId, sku }
+          );
+        }
+        if (action === "upsert" && (!title?.trim() || !kind || coinPrice === void 0)) {
+          return errorResult(
+            "update_game_economy_catalog",
+            "PRODUCT_FIELDS_REQUIRED",
+            "An upsert needs title, kind, and coinPrice.",
+            "The catalog was not changed.",
+            [
+              "Pass title, kind (durable or consumable), and coinPrice in Coins.",
+              "An upsert replaces every field of an existing SKU \u2014 read it with get_game_economy_catalog first and resend the fields worth keeping."
+            ],
+            { game_id: gameId, sku }
+          );
+        }
+        const draftRevision = expectedDraftRevision ?? (await getEconomyCatalog(gameId)).draftRevision;
+        const operationId = (0, import_node_crypto2.randomUUID)();
+        const catalog = action === "upsert" ? await upsertEconomyProduct({
+          gameId,
+          expectedDraftRevision: draftRevision,
+          operationId,
+          product: {
+            sku,
+            title: title.trim(),
+            ...description === void 0 ? {} : { description },
+            kind,
+            coinPrice,
+            ...grantQuantity === void 0 ? {} : { grantQuantity },
+            ...purchaseLimitPerPlayer === void 0 ? {} : { purchaseLimitPerPlayer },
+            ...iconPath === void 0 ? {} : { iconPath }
+          }
+        }) : await retireEconomyProduct({
+          gameId,
+          sku,
+          expectedDraftRevision: draftRevision,
+          operationId
+        });
+        return successResult(
+          "update_game_economy_catalog",
+          action === "upsert" ? `Drafted ${sku} in ${gameId}'s catalog. ${describeCatalog(catalog)}` : `Retired ${sku} permanently. ${describeCatalog(catalog)}`,
+          describeCatalogData(catalog),
+          [
+            ...action === "upsert" ? [
+              `The game buys it with Portals.economy.purchase("${sku}") from a click or tap handler.`,
+              "Try it against the simulated wallet with test_game_economy_purchase before publishing."
+            ] : [
+              "Players who already own this SKU keep it in their inventory \u2014 code that reads it must keep working."
+            ],
+            ...catalogNextSteps(catalog)
+          ]
+        );
+      } catch (error51) {
+        const message = toErrorMessage(error51);
+        return errorResult(
+          "update_game_economy_catalog",
+          "UPDATE_GAME_ECONOMY_CATALOG_FAILED",
+          message,
+          "The catalog was not changed.",
+          [
+            ...message.includes("DRAFT_CONFLICT") ? ["The draft moved since it was read \u2014 call get_game_economy_catalog and retry against the new draft_revision."] : [],
+            ...message.includes("SKU_RETIRED") ? ["This SKU was retired and can never be re-created \u2014 choose a different one."] : [],
+            ...message.includes("PRODUCT_LIMIT") ? [
+              `A game may hold ${ECONOMY_LIMITS.maxActiveProducts} active and ${ECONOMY_LIMITS.maxLifetimeProducts} lifetime SKUs \u2014 retire something before adding more.`
+            ] : [],
+            "Only the game's owner can change its catalog."
+          ],
+          { game_id: gameId, sku, action }
+        );
+      }
+    }
+  );
+  server2.registerTool(
+    "test_game_economy_purchase",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        // `reset` throws away the simulated wallet and everything it holds.
+        destructiveHint: true
+      },
+      description: "Exercise a game's in-game purchases against the owner's simulated wallet \u2014 no real Coins, no real player inventory. This is how the purchase and consume paths get tested before publishing, and the only way to make a failure path happen on demand: `scenario` forces a purchase to come back cancelled, out of Coins, or retryable, which is exactly what game code most often handles wrongly. `view` reads the simulated balance and inventory, `purchase` buys a drafted SKU, `consume` spends a consumable, `refund` reverses a receipt, and `reset` returns the wallet to its 10,000-Coin starting state and clears everything it holds.",
+      inputSchema: {
+        gameId: external_exports.string().describe("Web game to test (from list_web_games)."),
+        action: external_exports.enum(["view", "purchase", "consume", "refund", "reset"]).describe("What to do against the simulated wallet."),
+        sku: external_exports.string().optional().describe("Product to buy or spend. Required for purchase and consume."),
+        scenario: external_exports.enum(["success", "cancelled", "insufficient", "retryable"]).optional().describe(
+          "How the simulated purchase resolves. `success` completes it; `cancelled` is the player dismissing the Portals confirmation; `insufficient` is an empty wallet; `retryable` is a transient host failure. Purchase only, defaults to success."
+        ),
+        quantity: external_exports.number().int().optional().describe("How many units to spend. Consume only, defaults to 1."),
+        receiptId: external_exports.string().optional().describe("Receipt to reverse, from a previous purchase. Required for refund.")
+      }
+    },
+    async ({ gameId, action, sku, scenario, quantity, receiptId }) => {
+      const needsSku = action === "purchase" || action === "consume";
+      try {
+        if (needsSku && !sku?.trim()) {
+          return errorResult(
+            "test_game_economy_purchase",
+            "SKU_REQUIRED",
+            `A ${action} needs a sku.`,
+            "Nothing was simulated.",
+            ["Call get_game_economy_catalog to list the game's drafted SKUs."],
+            { game_id: gameId, action }
+          );
+        }
+        if (action === "refund" && !receiptId?.trim()) {
+          return errorResult(
+            "test_game_economy_purchase",
+            "RECEIPT_ID_REQUIRED",
+            "A refund needs the receiptId of a previous simulated purchase.",
+            "Nothing was simulated.",
+            ["Run a purchase first \u2014 its result carries the receipt id."],
+            { game_id: gameId, action }
+          );
+        }
+        const operationId = (0, import_node_crypto2.randomUUID)();
+        let sandbox;
+        let receipt = null;
+        switch (action) {
+          case "view":
+            sandbox = await getEconomySandbox(gameId);
+            break;
+          case "reset":
+            sandbox = await resetEconomySandbox({ gameId, operationId });
+            break;
+          case "consume":
+            sandbox = await consumeInEconomySandbox({
+              gameId,
+              sku,
+              quantity: quantity ?? 1,
+              operationId
+            });
+            break;
+          case "purchase": {
+            const result = await purchaseInEconomySandbox({
+              gameId,
+              sku,
+              scenario: scenario ?? "success",
+              operationId
+            });
+            sandbox = result.sandbox;
+            receipt = result.receipt;
+            break;
+          }
+          case "refund": {
+            const result = await refundInEconomySandbox({
+              gameId,
+              receiptId,
+              operationId
+            });
+            sandbox = result.sandbox;
+            receipt = result.receipt;
+            break;
+          }
+        }
+        return successResult(
+          "test_game_economy_purchase",
+          `Simulated ${action} on ${gameId}. Balance ${sandbox.balanceCoins.toLocaleString()} Coins across ${sandbox.inventory.length} owned SKU${sandbox.inventory.length === 1 ? "" : "s"}.`,
+          {
+            game_id: gameId,
+            action,
+            balance_coins: sandbox.balanceCoins,
+            generation: sandbox.generation,
+            inventory: sandbox.inventory.map((item) => ({
+              sku: item.sku,
+              kind: item.kind,
+              quantity: item.quantity,
+              purchase_count: item.purchaseCount
+            })),
+            ...receipt ? {
+              receipt: {
+                id: receipt.id,
+                status: receipt.status,
+                balance_after_coins: receipt.balanceAfterCoins
+              }
+            } : {}
+          },
+          [
+            "This wallet is simulated and owner-only \u2014 it never touches real Coins or a player's inventory.",
+            ...action === "purchase" && (scenario ?? "success") === "success" ? [
+              "Run the same purchase with scenario=cancelled and scenario=insufficient \u2014 a cancelled confirmation is a normal result the game must handle, not an error."
+            ] : []
+          ]
+        );
+      } catch (error51) {
+        const message = toErrorMessage(error51);
+        return errorResult(
+          "test_game_economy_purchase",
+          "TEST_GAME_ECONOMY_PURCHASE_FAILED",
+          message,
+          "Nothing was simulated.",
+          [
+            ...message.includes("PRODUCT_NOT_FOUND") ? ["Draft the SKU first with update_game_economy_catalog."] : [],
+            ...message.includes("SANDBOX_INSUFFICIENT_COINS") || message.includes("INSUFFICIENT_QUANTITY") ? ["Call this tool with action=reset to restore the 10,000-Coin starting balance."] : [],
+            "Only the game's owner can use its sandbox."
+          ],
+          { game_id: gameId, action, ...sku ? { sku } : {} }
+        );
+      }
+    }
+  );
+}
+function describeCatalog(catalog) {
+  if (!catalog.configured) return "This game has no product catalog yet.";
+  const priced = catalog.minCoinPrice === null ? "" : ` priced ${catalog.minCoinPrice.toLocaleString()}\u2013${catalog.maxCoinPrice.toLocaleString()} Coins`;
+  return `${catalog.activeProductCount} active product${catalog.activeProductCount === 1 ? "" : "s"}${priced}, ${catalog.retiredProductCount} retired. Draft revision ${catalog.draftRevision}, review ${catalog.draftReviewStatus}.`;
+}
+function describeCatalogData(catalog) {
+  return {
+    game_id: catalog.gameId,
+    configured: catalog.configured,
+    draft_revision: catalog.draftRevision,
+    draft_review_status: catalog.draftReviewStatus,
+    live_catalog_revision: catalog.activeCatalogRevision,
+    scheduled_catalog_revision: catalog.scheduledCatalogRevision,
+    active_product_count: catalog.activeProductCount,
+    retired_product_count: catalog.retiredProductCount,
+    products: catalog.products.map(describeProduct)
+  };
+}
+function describeProduct(product) {
+  return {
+    sku: product.sku,
+    title: product.title,
+    description: product.description,
+    kind: product.kind,
+    coin_price: product.coinPrice,
+    grant_quantity: product.grantQuantity,
+    purchase_limit_per_player: product.purchaseLimitPerPlayer,
+    icon_path: product.iconPath,
+    status: product.status
+  };
+}
+function catalogNextSteps(catalog) {
+  const steps = [];
+  if (catalog.activeCatalogRevision === null) {
+    steps.push(
+      "No catalog is live yet \u2014 purchases only reach players once Portals reviews the draft and the game is published."
+    );
+  } else if (catalog.draftRevision !== catalog.activeCatalogRevision) {
+    steps.push(
+      `Draft revision ${catalog.draftRevision} is ahead of the live catalog (${catalog.activeCatalogRevision}) \u2014 players still get the live one until the game is published again.`
+    );
+  }
+  if (catalog.draftReviewStatus === "rejected") {
+    steps.push("The draft was rejected in review \u2014 the owner can read why at portals.to/my-games.");
+  }
+  steps.push(
+    "Live purchases also need the owner's monetization readiness (verified email, Stripe identity, account standing), which is only visible at portals.to/my-games."
+  );
+  return steps;
 }
 
 // src/instructions.ts
@@ -35207,6 +35690,16 @@ Generation costs credits and cannot be undone, so prefer reusing what is already
 ## Marketplace assets
 
 list_marketplace_assets fetches creator-made assets from portals.to/marketplace \u2014 3D models, packs, textures, audio, shaders, animations. source "free" lists every free item on the public browse surface (costs nothing, needs no credits); source "purchased" lists everything this account owns \u2014 claimed free items and paid purchases \u2014 with direct asset URLs that save_generated_asset writes into the game's directory like any generated asset. The marketplace does not expose an item's files until it is owned, so fetching a free item is two steps: claim_marketplace_asset with its id (free, permanent for the account; a pack grants each contained item), which returns the unlocked URLs, then save_generated_asset to land the file. Paid items are bought on portals.to/marketplace, never through the MCP. Before generating a 3D model with credits, check whether a free marketplace asset already fits \u2014 claiming one costs nothing.
+
+## In-game purchases
+
+A game sells to its own players with Portals.economy: getCatalog() lists the released products, purchase(sku) opens Portals-owned confirmation UI from a click or tap, getInventory() reports what the player owns, and consume(sku, quantity, operationId) spends a consumable. Coins are the currency; the game never sees a card, a dollar price, or a wallet balance.
+
+Products live in the game's catalog, not in its code. get_game_economy_catalog reads it and update_game_economy_catalog drafts a SKU \u2014 a durable is owned once, a consumable grants a spendable quantity, and prices run 10\u20135,400 Coins. Write game code against a SKU only after it exists in the catalog: purchase(sku) can sell nothing else. Retiring a SKU is permanent, since players who bought it keep the entitlement.
+
+test_game_economy_purchase exercises all of it against the owner's simulated 10,000-Coin wallet, including the failure paths a real player hits \u2014 its scenario argument forces a cancelled confirmation, an empty wallet, or a retryable host error on demand. A cancelled purchase resolves normally with status "cancelled"; it is not an error, and treating it as one is the usual bug.
+
+Drafted products reach players only after Portals reviews the catalog and the game is published, and live purchases additionally need the owner's monetization readiness \u2014 verified email, Stripe identity, account standing \u2014 which is visible only at portals.to/my-games.
 
 Full docs: https://portals.to/documentation/advanced-tooling/portals-sdk, https://portals.to/documentation/advanced-tooling/multiplayer-and-voice and https://portals.to/documentation/advanced-tooling/guardian-avatars`;
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals In-Game Purchases"
+  short_description: "Sell products for Coins inside a Portals game"
+  default_prompt: "Use $portals-game-economy to add in-game purchases to my game."

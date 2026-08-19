@@ -18,6 +18,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 - `portals-server-scripts` — a root `server.js` referee for lobbies, ready checks, authoritative countdowns, and kicking.
 - `portals-server-sim` — running the game simulation itself on the server: shared physics, snapshots, client prediction, and fallback to host authority.
 - `portals-guardian-avatars` — Guardian avatars, wearables, animation, and the character controller in Three.js.
+- `portals-game-economy` — selling in-game products for Coins: the product catalog, `Portals.economy` purchases, and the purchase sandbox.
 
 ## Choose the workflow
 
