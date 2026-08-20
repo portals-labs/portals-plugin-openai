@@ -1,6 +1,6 @@
 ---
 name: portals-sdk
-description: Use the Portals SDK in a hosted web game for player identity, Portals sign-in, saved progress, casual scores, and leaderboards. Use when working with the global Portals object, _portals/sdk.js, Portals.ready, Portals.identity.requestLogin, saveState/loadState, submitScore, getLeaderboard, Portals.quit, playerId, or standalone vs room host context.
+description: Use the Portals SDK in a hosted web game for player identity, Portals sign-in, saved progress, casual scores, leaderboards, and the host-owned game UI safe area. Use when working with the global Portals object, _portals/sdk.js, Portals.ready, Portals.identity.requestLogin, saveState/loadState, submitScore, getLeaderboard, Portals.quit, playerId, standalone vs room host context, or avoiding the persistent top-left Portals controls.
 ---
 
 # Portals SDK
@@ -19,6 +19,12 @@ Portals stamps the SDK into every processed preview and published bundle. Includ
 ```
 
 Never download, edit, or bundle `_portals/sdk.js` — Portals replaces the managed copy on every process and publish. TypeScript declarations live at `https://portals.to/portals-sdk/portals.d.ts`; they are not part of the game's files.
+
+## Host UI reserve
+
+Every launched game keeps a trusted Portals controls trigger above the game iframe. The current closed trigger is 44×44 CSS pixels at `left: max(12px, env(safe-area-inset-left))` and `top: max(12px, env(safe-area-inset-top))`; a party badge may extend 4px beyond it. Keep essential and interactive HUD UI outside that top-left footprint. For a top HUD, use `padding-left: calc(max(12px, env(safe-area-inset-left)) + 56px)`; for a left HUD, use the equivalent top inset. A full-bleed non-interactive playfield is fine.
+
+The host control is outside and above untrusted game code. Never try to hide, restyle, intercept, or out-z-index it. Its expanded panel may temporarily cover more of the game and owns focus while open, so pause or otherwise keep gameplay safe until focus returns.
 
 ## Rules that are easy to get wrong
 

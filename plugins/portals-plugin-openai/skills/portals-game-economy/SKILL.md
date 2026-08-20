@@ -13,12 +13,15 @@ Read [references/portals-game-economy.md](references/portals-game-economy.md) fo
 
 A game can only sell a **SKU that exists in its catalog**, authored per game and pinned to a release. `purchase("anything_else")` cannot invent a product. So the order of work is catalog first, code second:
 
-1. `get_game_economy_catalog` — read what the game already sells, and its `draft_revision`.
-2. `update_game_economy_catalog` — draft a SKU (`upsert`), or withdraw one (`retire`).
-3. Write game code against those exact SKU strings.
-4. `test_game_economy_purchase` — run it against the owner's simulated wallet.
+1. `list_web_games` — resolve the game ID when it is not already known.
+2. `get_game_economy_catalog` — read what the game already sells, and its `draft_revision`.
+3. `update_game_economy_catalog` — draft a SKU (`upsert`), or withdraw one (`retire`).
+4. Write game code against those exact SKU strings.
+5. `test_game_economy_purchase` — run it against the owner's simulated wallet.
 
 Drafted products reach players only after Portals reviews the catalog **and** the owner publishes the game. Editing the draft never changes what a live game charges today.
+
+When the user asks to add microtransactions, call these tools yourself; do not send them to My Games for ordinary draft setup. If they did not specify every field, form a small coherent proposal from the requested game design and state the SKU/price/kind/grant/limit assumptions. Confirm a new SKU and its kind before its first upsert because both are permanent catalog identity choices; then perform the catalog writes yourself. Read before every write, preserve all intended fields because upsert replaces the whole product, and carry the returned revision into the next write. A permanent retirement still requires explicit intent.
 
 A product is one of two kinds, and the choice is permanent for that SKU:
 
@@ -45,7 +48,8 @@ Buying must start from a real player gesture:
 buyButton.addEventListener("click", async () => {
   const result = await Portals.economy.purchase("extra_lives_5");
   if (result.status === "cancelled") return;   // normal, not an error
-  lives += result.quantity;
+  const inventory = await Portals.economy.getInventory();
+  applyEntitlements(inventory);
 });
 ```
 

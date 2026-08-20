@@ -1,6 +1,6 @@
 {
   "name": "portals-plugin-openai",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Build, manage, and publish Portals browser games from Codex.",
   "author": {
     "name": "Portals",
@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Portals Web Games",
     "shortDescription": "Build and publish browser games on Portals",
-    "longDescription": "Create and manage Portals browser game projects, edit and synchronize their source, configure publishing metadata, add multiplayer and Guardian avatars, and generate game-ready images, audio, textures, and 3D models.",
+    "longDescription": "Create and manage Portals browser game projects, edit and synchronize their source, configure publishing metadata and Coin product catalogs, test purchases safely, add multiplayer and Guardian avatars, and generate game-ready images, audio, textures, and 3D models.",
     "developerName": "Portals",
     "category": "Developer Tools",
     "capabilities": [
@@ -33,7 +33,7 @@
     "defaultPrompt": [
       "Create and publish a browser game on Portals.",
       "Pull my Portals game, update it, and push it safely.",
-      "Add Portals multiplayer and Guardian avatars to my game."
+      "Add Portals multiplayer, Guardian avatars, or Coin microtransactions with a configured product catalog to my game."
     ],
     "composerIcon": "./assets/portals-icon.png",
     "logo": "./assets/portals-icon.png"

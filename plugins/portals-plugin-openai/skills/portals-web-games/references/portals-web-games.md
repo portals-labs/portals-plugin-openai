@@ -36,6 +36,12 @@ TypeScript declarations are not part of the game's files — for a TS project do
 
 All async SDK methods can reject (network, access restrictions) — handle rejections. Casual scores are client-reported: never use scores or peer messages to award currency, paid prizes, access, or any valuable entitlement. Never put API keys, tokens, or other secrets in game code or saved state.
 
+## Host-owned Portals controls
+
+Every launched game keeps a trusted Portals controls trigger above the game iframe in the top-left corner. The current closed trigger is 44×44 CSS pixels at left: max(12px, env(safe-area-inset-left)) and top: max(12px, env(safe-area-inset-top)); a party badge may extend 4px beyond it. Keep essential and interactive HUD UI outside that footprint. A top HUD should reserve padding-left: calc(max(12px, env(safe-area-inset-left)) + 56px), and a left HUD should reserve the equivalent top inset. The non-interactive playfield may remain full-bleed.
+
+The host control is outside and above game code. Never try to hide, restyle, intercept, or out-z-index it. Its expanded panel may temporarily cover more of the game and owns pointer/keyboard focus while open, so pause or otherwise keep gameplay safe until focus returns.
+
 ## Multiplayer — Portals.net
 
 Multiplayer is what sets Portals games apart: when building or updating a game, default to including at least a lightweight Portals.net feature — live player presence, a shared score race, co-op or turn-taking, in-game chat — and propose one to the developer if they haven't asked. The minimum version is a few lines (join() plus a send() or setState()); only skip it when it truly doesn't fit the game.
@@ -271,5 +277,17 @@ Every generated asset must ship inside the bundle and be referenced by a path re
 A published game is served under img-src 'self' / connect-src 'self' / media-src 'self', so the CDN URL a generator returns loads on a local dev server and then fails on Portals — the exact bug that looks like "it worked yesterday". The tools save the file for this reason; keep it in the pushed directory and never fetch an asset URL at runtime. Generated files count against the bundle limits (500 files, 50 MB per file, 100 MB total), so mind the size of music tracks and hero models.
 
 Generation costs credits and cannot be undone, so prefer reusing what is already there: check list_generated_assets before generating another variant, and re-prompt rather than regenerate in a loop. A texture is 3 credits, an image 20, a sound effect 20, speech 45 per 1,000 characters, music 70 per minute, a 3D model 60–75.
+
+## In-game purchases
+
+A game sells to its own players with Portals.economy: getCatalog() lists the released products, purchase(sku) opens Portals-owned confirmation UI from a click or tap, getInventory() reports what the player owns, and consume(sku, quantity, operationId) spends a consumable. Coins are the currency; the game never sees a card, a dollar price, or a wallet balance.
+
+Products live in the game's catalog, not in its code. When the user asks for microtransactions, configure the draft yourself instead of sending them to My Games: list_web_games resolves the game, get_game_economy_catalog reads the current products and draft_revision, and update_game_economy_catalog drafts each exact SKU with optimistic concurrency. If product details were omitted, form a small coherent proposal from the requested game design and report the SKU, price, kind, grant, and limit assumptions. Confirm each new SKU and its kind before the first upsert because both are permanent catalog identity choices; the agent still performs the writes. An upsert replaces every field, so read first, preserve intended values, and carry the returned revision into the next write. Retiring a SKU is permanent and requires explicit intent.
+
+Only then write game code against those exact SKU strings. Build the shop display from getCatalog() rather than hardcoding prices: purchase(sku) can sell nothing outside the released catalog. A durable is owned once, a consumable grants a spendable quantity, and prices run 10–5,400 Coins.
+
+test_game_economy_purchase exercises all of it against the owner's simulated 10,000-Coin wallet, including success, cancellation, insufficient balance, retryable failure, consume, and refund/revocation behavior. It creates a fresh operation ID per action, so consume idempotency is verified separately in game code or automated tests by repeating the same gameplay event ID. A cancelled purchase resolves normally with status "cancelled"; it is not an error, and treating it as one is the usual bug.
+
+Drafted products reach players only after Portals reviews the catalog and the game is published, and live purchases additionally need the owner's monetization readiness — verified email, Stripe identity, account standing — which is visible only at portals.to/my-games.
 
 Full docs: https://portals.to/documentation/advanced-tooling/portals-sdk, https://portals.to/documentation/advanced-tooling/multiplayer-and-voice and https://portals.to/documentation/advanced-tooling/guardian-avatars

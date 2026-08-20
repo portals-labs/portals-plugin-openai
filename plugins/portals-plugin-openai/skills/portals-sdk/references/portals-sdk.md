@@ -40,6 +40,26 @@ start().catch(console.error);
 
 `session.context` is `standalone` on a game page and `room` when the same game is open inside a Portals room.
 
+## Leave room for Portals controls
+
+Every launched game keeps a trusted Portals controls button above the game in the top-left corner. It is host UI outside the game iframe, so game code cannot hide, restyle, intercept, or out-z-index it.
+
+The current closed trigger is **44 × 44 CSS pixels**. Its top and left positions are each the larger of `12px` and the matching device safe-area inset. A party-count badge may extend 4px beyond the button. Keep essential labels and interactive game UI outside that footprint; the canvas or other non-interactive playfield can still remain full-bleed.
+
+For a top HUD, reserve the left edge. For a left HUD, reserve the top edge:
+
+```css
+.game-hud--top {
+  padding-left: calc(max(12px, env(safe-area-inset-left)) + 56px);
+}
+
+.game-hud--left {
+  padding-top: calc(max(12px, env(safe-area-inset-top)) + 56px);
+}
+```
+
+The additional 56px covers the 44px button, the possible badge extension, and a small visual gap. When the player opens Portals controls, the larger host-owned panel may temporarily cover more of the game and takes pointer and keyboard focus. Keep gameplay safe while it is open and restore the game UI cleanly when focus returns.
+
 ## Sign in from the game
 
 Call sign-in from a direct player action such as a button click. Portals owns the sign-in interface. Never ask for a Portals password or other account credential inside your game.

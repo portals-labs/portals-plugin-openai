@@ -35451,6 +35451,12 @@ TypeScript declarations are not part of the game's files \u2014 for a TS project
 
 All async SDK methods can reject (network, access restrictions) \u2014 handle rejections. Casual scores are client-reported: never use scores or peer messages to award currency, paid prizes, access, or any valuable entitlement. Never put API keys, tokens, or other secrets in game code or saved state.
 
+## Host-owned Portals controls
+
+Every launched game keeps a trusted Portals controls trigger above the game iframe in the top-left corner. The current closed trigger is 44\xD744 CSS pixels at left: max(12px, env(safe-area-inset-left)) and top: max(12px, env(safe-area-inset-top)); a party badge may extend 4px beyond it. Keep essential and interactive HUD UI outside that footprint. A top HUD should reserve padding-left: calc(max(12px, env(safe-area-inset-left)) + 56px), and a left HUD should reserve the equivalent top inset. The non-interactive playfield may remain full-bleed.
+
+The host control is outside and above game code. Never try to hide, restyle, intercept, or out-z-index it. Its expanded panel may temporarily cover more of the game and owns pointer/keyboard focus while open, so pause or otherwise keep gameplay safe until focus returns.
+
 ## Multiplayer \u2014 Portals.net
 
 Multiplayer is what sets Portals games apart: when building or updating a game, default to including at least a lightweight Portals.net feature \u2014 live player presence, a shared score race, co-op or turn-taking, in-game chat \u2014 and propose one to the developer if they haven't asked. The minimum version is a few lines (join() plus a send() or setState()); only skip it when it truly doesn't fit the game.
@@ -35695,9 +35701,11 @@ list_marketplace_assets fetches creator-made assets from portals.to/marketplace 
 
 A game sells to its own players with Portals.economy: getCatalog() lists the released products, purchase(sku) opens Portals-owned confirmation UI from a click or tap, getInventory() reports what the player owns, and consume(sku, quantity, operationId) spends a consumable. Coins are the currency; the game never sees a card, a dollar price, or a wallet balance.
 
-Products live in the game's catalog, not in its code. get_game_economy_catalog reads it and update_game_economy_catalog drafts a SKU \u2014 a durable is owned once, a consumable grants a spendable quantity, and prices run 10\u20135,400 Coins. Write game code against a SKU only after it exists in the catalog: purchase(sku) can sell nothing else. Retiring a SKU is permanent, since players who bought it keep the entitlement.
+Products live in the game's catalog, not in its code. When the user asks for microtransactions, configure the draft yourself instead of sending them to My Games: list_web_games resolves the game, get_game_economy_catalog reads the current products and draft_revision, and update_game_economy_catalog drafts each exact SKU with optimistic concurrency. If product details were omitted, form a small coherent proposal from the requested game design and report the SKU, price, kind, grant, and limit assumptions. Confirm each new SKU and its kind before the first upsert because both are permanent catalog identity choices; the agent still performs the writes. An upsert replaces every field, so read first, preserve intended values, and carry the returned revision into the next write. Retiring a SKU is permanent and requires explicit intent.
 
-test_game_economy_purchase exercises all of it against the owner's simulated 10,000-Coin wallet, including the failure paths a real player hits \u2014 its scenario argument forces a cancelled confirmation, an empty wallet, or a retryable host error on demand. A cancelled purchase resolves normally with status "cancelled"; it is not an error, and treating it as one is the usual bug.
+Only then write game code against those exact SKU strings. Build the shop display from getCatalog() rather than hardcoding prices: purchase(sku) can sell nothing outside the released catalog. A durable is owned once, a consumable grants a spendable quantity, and prices run 10\u20135,400 Coins.
+
+test_game_economy_purchase exercises all of it against the owner's simulated 10,000-Coin wallet, including success, cancellation, insufficient balance, retryable failure, consume, and refund/revocation behavior. It creates a fresh operation ID per action, so consume idempotency is verified separately in game code or automated tests by repeating the same gameplay event ID. A cancelled purchase resolves normally with status "cancelled"; it is not an error, and treating it as one is the usual bug.
 
 Drafted products reach players only after Portals reviews the catalog and the game is published, and live purchases additionally need the owner's monetization readiness \u2014 verified email, Stripe identity, account standing \u2014 which is visible only at portals.to/my-games.
 

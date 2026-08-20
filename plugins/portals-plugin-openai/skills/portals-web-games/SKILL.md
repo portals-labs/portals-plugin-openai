@@ -1,6 +1,6 @@
 ---
 name: portals-web-games
-description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards, Portals.net multiplayer, Portals.voice, Guardian avatars, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
+description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards and host UI safe areas, Portals.economy Coin microtransactions and product catalogs, Portals.net multiplayer, Portals.voice, Guardian avatars, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
 ---
 
 # Portals Web Games
@@ -9,7 +9,7 @@ Use the `portals-web-games` MCP tools for remote Portals state and ordinary work
 
 ## Load the platform rules
 
-Before creating or changing a game, read [references/portals-web-games.md](references/portals-web-games.md) completely. Treat it as authoritative for the injected SDK, sandbox restrictions, multiplayer and voice limits, Guardian avatar integration, local development, and generated-asset rules. Those instructions are bundled from this MCP project's `src/instructions.ts`.
+Before creating or changing a game, read [references/portals-web-games.md](references/portals-web-games.md) completely. Treat it as authoritative for the injected SDK, host-owned UI reserve, Coin products, sandbox restrictions, multiplayer and voice limits, Guardian avatar integration, local development, and generated-asset rules. Those instructions are bundled from this MCP project's `src/instructions.ts`.
 
 For the full official documentation on one subsystem, use the dedicated skill instead of guessing at the API:
 
@@ -46,6 +46,18 @@ For the full official documentation on one subsystem, use the dedicated skill in
 - **Latency-sensitive multiplayer** (region-based servers for fast-paced games instead of the default one worldwide US room) is not settable through `update_web_game_settings` — direct the user to the toggle on the game's settings page at portals.to/my-games. The `portals-multiplayer-and-voice` skill explains the routing.
 - Do not mutate source or settings when the user only asks to inspect or explain.
 
+### Coin product workflow
+
+When the user asks for Coin microtransactions, configure the draft catalog yourself as part of the build. Do not send them to My Games to duplicate ordinary setup:
+
+1. Call `list_web_games` when the game ID is not already known, then `get_game_economy_catalog` before writing code or naming a SKU.
+2. If the user did not specify every product field, form a small coherent proposal from the requested game design and report the SKU, pricing, kind, grant, and limit assumptions. A new SKU and its kind are permanent catalog identity choices, so confirm those two fields before the first upsert; price, copy, grant, limit, and icon can be revised later. The agent still performs the catalog writes after confirmation.
+3. Call `update_game_economy_catalog` with `action: "upsert"` and the returned `draft_revision`. An upsert replaces every field, so preserve intended existing values and use the new revision for the next product. Use `retire` only when permanent withdrawal is explicitly intended.
+4. Implement the game against those exact SKUs and build its shop display from `Portals.economy.getCatalog()` rather than hardcoding product prices.
+5. Use `test_game_economy_purchase` to exercise success, cancellation, insufficient balance, retryable failure, consume, and refund/revocation handling in the simulated purchase sandbox. The tool creates a fresh operation ID per action, so verify consume idempotency separately in game code or automated tests by repeating the same gameplay event ID.
+
+Catalog tools only change the owner's draft. Portals review and an explicit owner publication are still required before products reach players; never publish merely to finish setup.
+
 ## Authentication
 
 Let the server reuse `PORTALS_ACCESS_KEY` or saved credentials first. Call `authenticate` only when the other tools report that authentication is required. Never print, copy, or commit access keys.
@@ -53,6 +65,7 @@ Let the server reuse `PORTALS_ACCESS_KEY` or saved credentials first. Call `auth
 ## Build rules
 
 - Keep `_portals` SDK files platform-managed. Follow the reference for the limited local-development exception.
+- Keep essential and interactive HUD elements out of the host-owned top-left reserve. The current trigger is 44×44 CSS pixels at the larger of 12px and the matching device safe-area inset. Use `padding-left: calc(max(12px, env(safe-area-inset-left)) + 56px)` for a top HUD or the equivalent `padding-top` expression for a left HUD. The playfield may remain full-bleed.
 - Default to proposing or adding a lightweight `Portals.net` feature when it suits the game. Respect the user's explicit choice to omit multiplayer.
 - Handle rejected SDK promises and unsigned-player states.
 - Never use client-reported scores or peer messages for valuable entitlements.
