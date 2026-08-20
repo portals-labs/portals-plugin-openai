@@ -19,7 +19,7 @@ A session is the set of players of your game in the same bucket. On the game pag
 
 ### Global channels
 
-Sessions are regional: fast-paced games place each region's players in their own copy of a channel, so nearby players meet by default and stay close to the server. Prefix a channel with `global:` to make it worldwide instead — every region joins the same room:
+By default every session runs on Portals' US servers, so players worldwide share one room per channel. A fast-paced game should turn on **Latency-sensitive multiplayer** in its settings on [My Games](https://portals.to/my-games): sessions are then placed on servers near their players — each region gets its own copy of a channel, so nearby players meet and stay close to the server, and players in different regions get separate rooms. The setting applies to new sessions immediately; no republish is needed. In a latency-sensitive game, prefix a channel with `global:` to make that channel worldwide again — every region joins the same room:
 
 ```js
 // One lobby for the whole world
@@ -30,7 +30,7 @@ await net.join({ channel: "global:lobby" });
 await net.join({ channel: "global:match-x7q2" });
 ```
 
-A global room runs in one place (the US home region), so distant players see higher latency. Use global channels for lobbies, matchmaking, and chat; keep fast-paced matches on regional channels unless a match deliberately spans regions. Slow-paced games (turn-based, chat-like traffic) are consolidated into one worldwide room automatically — the prefix guarantees it for a channel regardless of pace.
+A global room runs in one place (the US home region), so distant players see higher latency. Use global channels for lobbies, matchmaking, and chat; keep fast-paced matches on regional channels unless a match deliberately spans regions. A game without the latency-sensitive setting already runs every channel as one worldwide room — the prefix guarantees it for a channel regardless of the setting.
 
 ### Forcing a region
 
@@ -44,7 +44,7 @@ await net.join({ region: "eu" });
 await net.join({ channel: "match-x7q2", region: "us" });
 ```
 
-A pin outranks everything else that picks a region: the player's own location, the automatic consolidation of slow-paced games, and a `global:` prefix. Three things follow from that:
+A pin outranks everything else that picks a region: the player's own location, the game's latency-sensitive setting, and a `global:` prefix. Three things follow from that:
 
 - **Distant players pay the latency.** Pin when the game needs one known location for everyone — a scheduled event, a persistent world, a region your players share — and leave it off otherwise, since the default already keeps each player near their server.
 - **Every player of a room must pass the same pin.** The pin chooses which room you join, so a game that pins `"eu"` for some players and nothing (or `"us"`) for others splits them into separate rooms. That is also how you run deliberate US and EU rooms of one channel: let the player pick, and treat the two as separate worlds.

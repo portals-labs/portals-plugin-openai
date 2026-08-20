@@ -43,6 +43,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 
 - Use `list_web_games` before acting when the game ID is not already known.
 - Use `update_web_game_settings` without pulling source when the request only changes metadata or media.
+- **Latency-sensitive multiplayer** (region-based servers for fast-paced games instead of the default one worldwide US room) is not settable through `update_web_game_settings` — direct the user to the toggle on the game's settings page at portals.to/my-games. The `portals-multiplayer-and-voice` skill explains the routing.
 - Do not mutate source or settings when the user only asks to inspect or explain.
 
 ## Authentication
