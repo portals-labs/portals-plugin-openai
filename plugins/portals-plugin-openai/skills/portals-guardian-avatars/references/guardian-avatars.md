@@ -1,12 +1,12 @@
 # Guardian Avatars
 
-Source: [https://portals.to/documentation/advanced-tooling/guardian-avatars](https://portals.to/documentation/advanced-tooling/guardian-avatars) — the official Portals documentation, extended with the SDK reference for every released capability through 0.37.0. Version markers like (0.36.0) name the release a feature first shipped in; a game pinned below that version does not have it. Types: [portals.to/portals-sdk/guardians.d.ts](https://portals.to/portals-sdk/guardians.d.ts) — the source of truth for the API. Read it before writing code against a method not shown here.
+Source: [https://portals.to/documentation/web-games/guardian-avatars](https://portals.to/documentation/web-games/guardian-avatars) — the official Portals documentation, extended with the SDK reference for every released capability through 0.37.0. Version markers like (0.36.0) name the release a feature first shipped in; a game pinned below that version does not have it. Types: [portals.to/portals-sdk/guardians.d.ts](https://portals.to/portals-sdk/guardians.d.ts) — the source of truth for the API. Read it before writing code against a method not shown here.
 
 The Guardian avatar SDK renders the same avatars players wear across Portals — body types, skin/hair/eye colour, hair styles, the wearables system, retargeted locomotion clips, facial animation, and a first/third-person character controller with the Portals feel.
 
-It is a Three.js library, not a standalone renderer: you own the scene, camera and render loop, and the SDK adds avatars to it. For sign-in, saved progress, leaderboards and host control, see [Portals SDK](https://portals.to/documentation/advanced-tooling/portals-sdk).
+It is a Three.js library, not a standalone renderer: you own the scene, camera and render loop, and the SDK adds avatars to it. For sign-in, saved progress, leaderboards and host control, see [Portals SDK](https://portals.to/documentation/web-games/portals-sdk).
 
-Portals stamps the SDK into every processed preview and published bundle. Include it exactly like the [Portals SDK](https://portals.to/documentation/advanced-tooling/portals-sdk):
+Portals stamps the SDK into every processed preview and published bundle. Include it exactly like the [Portals SDK](https://portals.to/documentation/web-games/portals-sdk):
 
 ```html
 <script src="./_portals/sdk.js"></script>

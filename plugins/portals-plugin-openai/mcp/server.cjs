@@ -35709,7 +35709,7 @@ test_game_economy_purchase exercises all of it against the owner's simulated 10,
 
 Drafted products reach players only after Portals reviews the catalog and the game is published, and live purchases additionally need the owner's monetization readiness \u2014 verified email, Stripe identity, account standing \u2014 which is visible only at portals.to/my-games.
 
-Full docs: https://portals.to/documentation/advanced-tooling/portals-sdk, https://portals.to/documentation/advanced-tooling/multiplayer-and-voice and https://portals.to/documentation/advanced-tooling/guardian-avatars`;
+Full docs: https://portals.to/documentation/web-games/portals-sdk, https://portals.to/documentation/web-games/multiplayer-and-voice and https://portals.to/documentation/web-games/guardian-avatars`;
 
 // src/index.ts
 var server = new McpServer(

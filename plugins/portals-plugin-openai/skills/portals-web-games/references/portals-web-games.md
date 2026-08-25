@@ -5,6 +5,7 @@ This is the MCP server's bundled instruction set, copied from `src/instructions.
 ## Contents
 
 - [Portals SDK — identity, saves, leaderboards](#portals-sdk--identity-saves-leaderboards)
+- [Host-owned Portals controls](#host-owned-portals-controls)
 - [Multiplayer — Portals.net](#multiplayer--portalsnet)
 - [Voice — Portals.voice](#voice--portalsvoice)
 - [Guardian avatars — the 3D character SDK](#guardian-avatars--the-3d-character-sdk)
@@ -15,6 +16,8 @@ This is the MCP server's bundled instruction set, copied from `src/instructions.
 - [Guardian SDK versions and local development](#guardian-sdk-versions-and-local-development)
 - [Testing multiplayer on a local dev server](#testing-multiplayer-on-a-local-dev-server)
 - [Generated assets — art, audio, and 3D models](#generated-assets--art-audio-and-3d-models)
+- [Marketplace assets](#marketplace-assets)
+- [In-game purchases](#in-game-purchases)
 
 Games pushed with push_web_game_source run on Portals with an injected SDK. Load it before your game code — the file is managed by Portals, never modify or bundle it:
 
@@ -278,6 +281,10 @@ A published game is served under img-src 'self' / connect-src 'self' / media-src
 
 Generation costs credits and cannot be undone, so prefer reusing what is already there: check list_generated_assets before generating another variant, and re-prompt rather than regenerate in a loop. A texture is 3 credits, an image 20, a sound effect 20, speech 45 per 1,000 characters, music 70 per minute, a 3D model 60–75.
 
+## Marketplace assets
+
+list_marketplace_assets fetches creator-made assets from portals.to/marketplace — 3D models, packs, textures, audio, shaders, animations. source "free" lists every free item on the public browse surface (costs nothing, needs no credits); source "purchased" lists everything this account owns — claimed free items and paid purchases — with direct asset URLs that save_generated_asset writes into the game's directory like any generated asset. The marketplace does not expose an item's files until it is owned, so fetching a free item is two steps: claim_marketplace_asset with its id (free, permanent for the account; a pack grants each contained item), which returns the unlocked URLs, then save_generated_asset to land the file. Paid items are bought on portals.to/marketplace, never through the MCP. Before generating a 3D model with credits, check whether a free marketplace asset already fits — claiming one costs nothing.
+
 ## In-game purchases
 
 A game sells to its own players with Portals.economy: getCatalog() lists the released products, purchase(sku) opens Portals-owned confirmation UI from a click or tap, getInventory() reports what the player owns, and consume(sku, quantity, operationId) spends a consumable. Coins are the currency; the game never sees a card, a dollar price, or a wallet balance.
@@ -290,4 +297,4 @@ test_game_economy_purchase exercises all of it against the owner's simulated 10,
 
 Drafted products reach players only after Portals reviews the catalog and the game is published, and live purchases additionally need the owner's monetization readiness — verified email, Stripe identity, account standing — which is visible only at portals.to/my-games.
 
-Full docs: https://portals.to/documentation/advanced-tooling/portals-sdk, https://portals.to/documentation/advanced-tooling/multiplayer-and-voice and https://portals.to/documentation/advanced-tooling/guardian-avatars
+Full docs: https://portals.to/documentation/web-games/portals-sdk, https://portals.to/documentation/web-games/multiplayer-and-voice and https://portals.to/documentation/web-games/guardian-avatars

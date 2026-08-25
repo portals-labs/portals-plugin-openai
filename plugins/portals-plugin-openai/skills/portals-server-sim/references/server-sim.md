@@ -1,8 +1,8 @@
 # Server-Simulated Games
 
-Source: `content/docs/code-and-custom-ui/server-sim.md` in portal-backend-2 — verbatim copy of the official Portals documentation. Not yet published on portals.to.
+Source: [https://portals.to/documentation/web-games/server-sim](https://portals.to/documentation/web-games/server-sim) — verbatim copy of the official Portals documentation.
 
-[Server Scripts](https://portals.to/documentation/advanced-tooling/server-scripts) covers the contract: put a `server.js` at your project root and Portals runs it as an invisible, authoritative participant in every multiplayer session. That page shows a lobby — turn-taking, ready checks, verified scores. This page is the next level: the server script **simulates the game itself**, stepping the same physics your clients ship and broadcasting the result, so that nobody's tab owns the pitch.
+[Server Scripts](https://portals.to/documentation/web-games/server-scripts) covers the contract: put a `server.js` at your project root and Portals runs it as an invisible, authoritative participant in every multiplayer session. That page shows a lobby — turn-taking, ready checks, verified scores. This page is the next level: the server script **simulates the game itself**, stepping the same physics your clients ship and broadcasting the result, so that nobody's tab owns the pitch.
 
 The worked example throughout is FUTBOL, a 3D stickman football game: 90-second matches at up to 3v3, a worldwide lobby, and a ball that must read identically on every screen. Its server script — the *referee* — runs the football on Portals servers, every tab follows its snapshots, and the match survives the server crashing mid-game.
 
@@ -14,7 +14,7 @@ The worked example throughout is FUTBOL, a 3D stickman football game: 90-second 
 - **Witnessed outcomes.** A goal the server saw in its own simulation cannot be fabricated by any client; under host authority, every result is ultimately someone's claim.
 - **Symmetry.** On a regional channel the server sits at the relay, ~25 ms from everyone, instead of 0 ms from one player and a full round trip from the other.
 
-The exceptions are narrow: a purely cosmetic shared space (a co-op drawing canvas, an emote wall) or a slow turn-based game whose pace hides latency can ship [trust-light](https://portals.to/documentation/advanced-tooling/multiplayer-and-voice), with a plain [server script](https://portals.to/documentation/advanced-tooling/server-scripts) as referee where anything needs deciding. When in doubt, take the server sim — retrofitting authority into a shipped host-authoritative game is much harder than building on it, while the host-authority fallback comes with the server sim for free.
+The exceptions are narrow: a purely cosmetic shared space (a co-op drawing canvas, an emote wall) or a slow turn-based game whose pace hides latency can ship [trust-light](https://portals.to/documentation/web-games/multiplayer-and-voice), with a plain [server script](https://portals.to/documentation/web-games/server-scripts) as referee where anything needs deciding. When in doubt, take the server sim — retrofitting authority into a shipped host-authoritative game is much harder than building on it, while the host-authority fallback comes with the server sim for free.
 
 ## One simulation, shared
 
@@ -160,7 +160,7 @@ if (was && (was.phase === "play" || was.phase === "count")) {
 
 ## Budgets that shape the design
 
-The [sandbox limits](https://portals.to/documentation/advanced-tooling/server-scripts#limits) are not commentary — each one is load-bearing here, and FUTBOL's probe run confirmed them in practice:
+The [sandbox limits](https://portals.to/documentation/web-games/server-scripts#limits) are not commentary — each one is load-bearing here, and FUTBOL's probe run confirmed them in practice:
 
 | Budget | Measured | What it forces |
 | --- | --- | --- |
@@ -202,7 +202,7 @@ Drive the lobby, a simulated match, the fallback and a hot swap through it; exit
 
 - The **editor preview** runs your draft's `server.js` against a real session — two preview panes (the 2p device) are a two-player match on one screen.
 - **Server logs** from both your script (`server.log(...)`, shown as `[script]`) and the platform around it (session starts, crashes, `script fatal` lines) appear in the editor: open the preview's bug icon and switch to the **Server logs** tab. Fleet failures light the icon on their own.
-- **Local dev sessions** (via a [dev token](https://portals.to/documentation/advanced-tooling/multiplayer-and-voice#test-multiplayer-locally)) get the **published** server script, never the one on your disk — so a draft has no server there, which exercises exactly the fallback rung your design must keep working. `net.getState("server:...")` in the console tells you which world you are in.
+- **Local dev sessions** (via a [dev token](https://portals.to/documentation/web-games/multiplayer-and-voice#test-multiplayer-locally)) get the **published** server script, never the one on your disk — so a draft has no server there, which exercises exactly the fallback rung your design must keep working. `net.getState("server:...")` in the console tells you which world you are in.
 
 ## The shape of it
 

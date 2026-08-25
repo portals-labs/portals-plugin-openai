@@ -35,7 +35,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 1. Call `create_web_game` and retain the returned game ID and editor URL.
 2. Create the game in a dedicated local directory with `index.html` at its root.
 3. Implement and test the game using the bundled platform rules.
-4. Call `push_web_game_source` with the local game directory. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing.
+4. Call `push_web_game_source` with the local game directory. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing. Leaderboards work there and in the editor preview, on a separate draft board, so a leaderboard can be tested before publishing.
 5. Use `update_web_game_settings` for publishing metadata and media. Report any remaining publishing requirements returned by the tool.
 6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`.
 

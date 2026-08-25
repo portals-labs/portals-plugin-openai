@@ -1,17 +1,17 @@
 # Server Scripts (server.js)
 
-Source: `content/docs/code-and-custom-ui/server-scripts.md` in portal-backend-2, published at [https://portals.to/documentation/advanced-tooling/server-scripts](https://portals.to/documentation/advanced-tooling/server-scripts) — verbatim copy of the official Portals documentation.
+Source: [https://portals.to/documentation/web-games/server-scripts](https://portals.to/documentation/web-games/server-scripts) — verbatim copy of the official Portals documentation.
 
 Without one of these, there is no server-side game logic on Portals: every client is authoritative over what it sends, and a session is exactly as trustworthy as its least trustworthy player. A **server script** changes that: add a single file named `server.js` at the root of your project and Portals runs it on its own servers as an invisible, authoritative participant in every multiplayer session of your game.
 
-**Every multiplayer game should ship with one.** For a real-time game the preferred form is to run the whole simulation in it — [Server-Simulated Games](https://portals.to/documentation/advanced-tooling/server-sim) is that architecture and the default choice for multiplayer on Portals. Even a game that doesn't simulate on the server needs its referee — someone no player controls:
+**Every multiplayer game should ship with one.** For a real-time game the preferred form is to run the whole simulation in it — [Server-Simulated Games](https://portals.to/documentation/web-games/server-sim) is that architecture and the default choice for multiplayer on Portals. Even a game that doesn't simulate on the server needs its referee — someone no player controls:
 
 - A **lobby** with ready checks that starts the game for everyone at the same moment
 - **Countdowns and timers** that must not drift or depend on any one player's tab
 - **Authoritative state** players can read but not overwrite (phase, verified scores, turn order)
 - **Kicking** misbehaving players from a session
 
-Going without is for the narrow cases where nothing is contested — purely cosmetic co-op canvases and emote walls — and even there, [Multiplayer & Voice](https://portals.to/documentation/advanced-tooling/multiplayer-and-voice) applies: never let a peer's messages control anything valuable.
+Going without is for the narrow cases where nothing is contested — purely cosmetic co-op canvases and emote walls — and even there, [Multiplayer & Voice](https://portals.to/documentation/web-games/multiplayer-and-voice) applies: never let a peer's messages control anything valuable.
 
 In the AI editor you rarely write it by hand: ask for the behavior — *"add a lobby with ready checks that starts a 3-second countdown when everyone is ready"* — and the AI writes both `server.js` and the client code that talks to it.
 
@@ -151,7 +151,7 @@ net.on("state", (key, value) => {
 
 Test in the editor preview: it runs your **draft's** `server.js` against a real session, so you and a second tab can exercise the whole flow before publishing. After editing the script, reload the preview to swap the running server.
 
-Sessions joined from a local dev server with a [dev token](https://portals.to/documentation/advanced-tooling/multiplayer-and-voice#test-multiplayer-locally) get a server too, but it runs your **published** `server.js` — Portals fetches the script from your live release, never from your machine. Iterate on the script itself in the editor preview; use local sessions to develop the client against the published server behavior.
+Sessions joined from a local dev server with a [dev token](https://portals.to/documentation/web-games/multiplayer-and-voice#test-multiplayer-locally) get a server too, but it runs your **published** `server.js` — Portals fetches the script from your live release, never from your machine. Iterate on the script itself in the editor preview; use local sessions to develop the client against the published server behavior.
 
 `server.log(...)` output appears in the editor's **Server logs** tab: click the bug icon in the preview toolbar and switch tabs. It shows your script's lines (marked `[script]`) and the platform's own — session starts, crashes, budget violations — for the last hour up to the last day, and a script failure lights the bug icon by itself. For values you want to watch continuously, a state key still works well:
 
@@ -173,4 +173,4 @@ server.setState("server:debug", { readyCount: ready.size, at: Date.now() });
 | `server.clearTimer(id)` | Cancels a timer from either function. |
 | `server.log(...values)` | Diagnostic logging, shown in the editor's Server logs tab. |
 
-For the client-side API, sessions, and channels, see [Multiplayer & Voice](https://portals.to/documentation/advanced-tooling/multiplayer-and-voice). To run the game simulation itself on the server — shared physics, snapshots, prediction, and graceful fallback — see [Server-Simulated Games](https://portals.to/documentation/advanced-tooling/server-sim).
+For the client-side API, sessions, and channels, see [Multiplayer & Voice](https://portals.to/documentation/web-games/multiplayer-and-voice). To run the game simulation itself on the server — shared physics, snapshots, prediction, and graceful fallback — see [Server-Simulated Games](https://portals.to/documentation/web-games/server-sim).

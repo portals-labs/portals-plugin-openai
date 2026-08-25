@@ -1,6 +1,6 @@
 # Multiplayer, Chat, and Voice
 
-Source: [https://portals.to/documentation/advanced-tooling/multiplayer-and-voice](https://portals.to/documentation/advanced-tooling/multiplayer-and-voice) — verbatim copy of the official Portals documentation.
+Source: [https://portals.to/documentation/web-games/multiplayer-and-voice](https://portals.to/documentation/web-games/multiplayer-and-voice) — verbatim copy of the official Portals documentation.
 
 Hosted web games run in a sandbox with no outside network access: `fetch`, WebSocket, and WebRTC connections to other servers fail, and networking libraries cannot work. `Portals.net` and `Portals.voice` are the only multiplayer and voice transports — the Portals host page owns the real connections on the game's behalf.
 
@@ -79,6 +79,18 @@ net.on("playerleave", (player, players) => renderRoster(players));
 
 Each player is `{ id, playerId, displayName, avatarUrl }`. `id` identifies the connection (two tabs are two players); `playerId` is the game-scoped identity from the Portals SDK and is `null` for signed-out players, so always render a fallback name.
 
+## Design for party members who join late
+
+While a party member has a hosted game open, the Portals party lobby shows that they are in game and lets another eligible party member follow them with **Join Game**. The late player is sent to the same game page and top-level session bucket: `public` by default, or the value in the page's `?channel=` query parameter.
+
+The game still owns what happens after that player arrives. Multiplayer games must:
+
+- handle `playerjoin` during every phase instead of assuming the roster is fixed at startup;
+- choose an explicit admission experience, such as spawning now, spectating, or waiting for the next round; and
+- reconstruct the current match from `join().state` or server-owned shared state. Transient `send()` events are not replayed.
+
+Portals cannot see a private sub-lobby name chosen only inside the game with `net.join({ channel })`. If late party members must follow a particular match, put its stable match code in the game-page URL (`?channel=match-x7q2`) and call `net.join()` without another subchannel, or derive the nested channel deterministically from that URL. Do not generate a one-off nested channel that only the first player's tab knows.
+
 ## Broadcast messages
 
 `net.send(data)` broadcasts up to 8 KB of JSON to the **other** players — your own client does not receive its own broadcast:
@@ -121,7 +133,7 @@ setInterval(() => {
 
 Without a server script there is no server-side game logic: every client is authoritative over what it sends, so the session is exactly as trustworthy as its least trustworthy player. Never let a peer's messages control currency, prizes, access, or another valuable entitlement — and for a multiplayer game, don't stop at trusting peers less: give the session an authority no player controls.
 
-**The default design for a multiplayer game is a server-simulated one** — a root `server.js` that runs your game's simulation on Portals servers, so outcomes are witnessed rather than claimed and no player's tab holds an advantage. [Server-Simulated Games](https://portals.to/documentation/advanced-tooling/server-sim) is the architecture; [Server Scripts](https://portals.to/documentation/advanced-tooling/server-scripts) is the underlying contract, and its lighter referee form (lobbies, ready checks, authoritative countdowns, kicking) is the minimum a multiplayer game should ship with.
+**The default design for a multiplayer game is a server-simulated one** — a root `server.js` that runs your game's simulation on Portals servers, so outcomes are witnessed rather than claimed and no player's tab holds an advantage. [Server-Simulated Games](https://portals.to/documentation/web-games/server-sim) is the architecture; [Server Scripts](https://portals.to/documentation/web-games/server-scripts) is the underlying contract, and its lighter referee form (lobbies, ready checks, authoritative countdowns, kicking) is the minimum a multiplayer game should ship with.
 
 The exceptions are narrow: purely cosmetic shared spaces (a co-op drawing canvas, an emote wall) and slow turn-based games whose pace hides latency can ship trust-light, with clients simply rendering what peers report.
 
@@ -310,7 +322,7 @@ What to know:
 
 - **Local sessions are fenced off.** They join a `dev` channel namespace (`join({ channel: "lobby" })` becomes `dev:lobby`), so a half-built local build never meets the live players of your published game.
 - **The token is a credential.** It grants multiplayer sessions on your game for 8 hours. Treat it like a password: never commit it, never ship it in a bundle. When it expires, `join()` rejects with a message saying so — mint a new one.
-- **Server scripts run too.** A published `server.js` joins your local sessions like any other; Portals runs it, not your machine (see [server scripts](https://portals.to/documentation/advanced-tooling/server-scripts)).
+- **Server scripts run too.** A published `server.js` joins your local sessions like any other; Portals runs it, not your machine (see [server scripts](https://portals.to/documentation/web-games/server-scripts)).
 - **Voice stays Portals-only.** `voice.join()` still rejects outside Portals.
 - Everything else that needs the host — saves, leaderboards, identity — keeps its documented no-host behavior (no-ops and `null`s).
 
@@ -333,4 +345,4 @@ What to know:
 | `voice.participants()` / `voice.self()` | Read the live voice roster / own participant synchronously. |
 | `voice.on(event, handler)` / `voice.off(event, handler)` | Subscribe to `participantjoin`, `participantleave`, `speaking`, `status`. |
 
-TypeScript declarations for every type on this page are available at [portals.d.ts](/portals-sdk/portals.d.ts). For identity, saved progress, and leaderboards, see [Portals SDK](https://portals.to/documentation/advanced-tooling/portals-sdk).
+TypeScript declarations for every type on this page are available at [portals.d.ts](https://portals.to/portals-sdk/portals.d.ts). For identity, saved progress, and leaderboards, see [Portals SDK](https://portals.to/documentation/web-games/portals-sdk).
