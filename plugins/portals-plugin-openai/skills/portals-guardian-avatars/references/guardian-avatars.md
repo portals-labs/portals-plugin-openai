@@ -177,6 +177,10 @@ renderer.setAnimationLoop(() => {
 
 `avatars.update(dt)` drives every avatar and controller — call it once per frame or nothing animates. It is also the mixer tick that rewrites every bone local from the clips, so **anything that writes bones — `Ragdoll.update()`, `aimWeapon()`, `applyPose()` — must run AFTER it** in the frame. Stepped before it, they are silently overwritten: the corpse plays its death clip and the gun never points anywhere. Nothing errors; it just does not work.
 
+From 0.42.0 a bone writer can register for that slot instead of the game holding the line in its frame loop: `avatars.onAfterUpdate(cb)` runs `cb(dt)` after the mixer pass and after controller post-updates, and returns an unsubscribe function. On older pinned versions, keep calling bone writers directly after `avatars.update(dt)`.
+
+To find those numbers — carry tables, grip offsets, recoil shares, `boneAdjust` maps — without an edit-and-reload cycle, use `$portals-pose-tuner`: a draft-only panel that binds the live tables your frame loop reads and adds a 3D gizmo for bone and weapon placement.
+
 ## Three.js is shared, not bundled
 
 The SDK does not ship its own copy of Three.js — it uses the same managed runtime, so the page has exactly one instance and objects the SDK creates work with your own scene graph, raycasters and materials.

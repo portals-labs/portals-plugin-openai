@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Pose Tuner"
+  short_description: "Tune procedural animation and bone poses live inside a running game"
+  default_prompt: "Use $portals-pose-tuner to tune my weapon carry pose and bone offsets live in the running game."
