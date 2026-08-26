@@ -31849,15 +31849,17 @@ async function processDraft(gameId, draftId) {
     body: { gameId, draftId }
   });
 }
-async function adoptDraft(gameId, draftId, expectedRevision) {
-  return arcadeRequest("/api/v2/arcade/adopt-draft", {
+async function adoptDraft(gameId, draftId, expectedRevision, tag) {
+  const data = await arcadeRequest("/api/v2/arcade/adopt-draft", {
     method: "POST",
     body: {
       gameId,
       draftId,
-      ...expectedRevision ? { expectedRevision } : {}
+      ...expectedRevision ? { expectedRevision } : {},
+      ...tag ? { tag } : {}
     }
   });
+  return { ...data, tag: data.tag ?? null };
 }
 async function downloadProject(gameId) {
   return arcadeRequest("/api/v2/arcade/download-project", {
@@ -33019,7 +33021,7 @@ function registerTools(server2) {
         openWorldHint: false,
         destructiveHint: true
       },
-      description: "Upload a local web game's source to Portals, replacing the project's current files. Point it at the directory that holds the runnable game \u2014 index.html must be at its root (for a bundler project that is dist/ or build/, after running the build). Pushing again overwrites: the project ends up mirroring the pushed directory, and files no longer present are removed. node_modules, .git, editor folders, and secrets are skipped automatically. Returns the editor link and a share_url anyone can open to play the pushed build right away; publishing to players stays a deliberate step in the Portals editor.",
+      description: "Upload a local web game's source to Portals, replacing the project's current files. Point it at the directory that holds the runnable game \u2014 index.html must be at its root (for a bundler project that is dist/ or build/, after running the build). Pushing again overwrites: the project ends up mirroring the pushed directory, and files no longer present are removed. node_modules, .git, editor folders, and secrets are skipped automatically. Returns the editor link and a share_url anyone can open to play the pushed build right away; publishing to players stays a deliberate step in the Portals editor. An optional `tag` labels the pushed draft, and a later publish inherits that label unless it names its own.",
       inputSchema: {
         directory: external_exports.string().describe("Path to the directory containing the built game, with index.html at its root."),
         gameId: external_exports.string().optional().describe("Existing web game to push into (from list_web_games). Omit to create a new project from `title`."),
@@ -33027,10 +33029,13 @@ function registerTools(server2) {
         description: external_exports.string().optional().describe("Description for a new project. Used only when gameId is omitted."),
         expectedRevision: external_exports.string().optional().describe(
           "Project revision this push is based on, from pull_web_game_source. When set, the push fails with PROJECT_CHANGED instead of overwriting edits made since that revision."
+        ),
+        tag: external_exports.string().optional().describe(
+          `Optional label for the draft this push becomes, shown on the game's page at portals.to/my-games \u2014 e.g. "wip-boss-fight" or "1.4.0". One line, 1\u201364 characters. Publishing later carries this label onto the released version unless that publish passes its own tag. The label describes the source now in the project, so a push without a tag clears the previous one. Pass it only when the user named a label or asked for the push to be tagged; never invent one.`
         )
       }
     },
-    async ({ directory, gameId: rawGameId, title, description, expectedRevision }) => {
+    async ({ directory, gameId: rawGameId, title, description, expectedRevision, tag }) => {
       let createdGame = null;
       try {
         const gameId = rawGameId?.trim();
@@ -33108,7 +33113,12 @@ function registerTools(server2) {
         const grant = await createDraftUpload(targetGameId, zip.length);
         await uploadDraftZip(grant, zip);
         const processed = await processDraft(targetGameId, grant.draftId);
-        const project = await adoptDraft(targetGameId, grant.draftId, expectedRevision);
+        const project = await adoptDraft(
+          targetGameId,
+          grant.draftId,
+          expectedRevision,
+          tag?.trim() || void 0
+        );
         const shareUrl = await createShareLink(targetGameId).catch(() => null);
         return successResult(
           "push_web_game_source",
@@ -33122,6 +33132,7 @@ function registerTools(server2) {
             total_bytes: project.totalBytes,
             revision: project.revision,
             replaced_existing_project: project.replacedExistingProject,
+            tag: project.tag,
             zip_bytes: zip.length,
             stack: processed.stack,
             sdk_version: processed.sdkVersion,
@@ -33139,6 +33150,9 @@ function registerTools(server2) {
               "The shareable link could not be minted this time \u2014 call get_web_game_share_link to get a URL others can play the pushed draft at."
             ],
             `Open ${editorUrl(targetGameId)} to run and edit the pushed code.`,
+            ...project.tag ? [
+              `This draft is labelled "${project.tag}" on the game's page at portals.to/my-games. A later publish_web_game carries that label onto the released version unless it passes its own tag.`
+            ] : [],
             `When the build is ready for players, call publish_web_game \u2014 publishing needs a description, genre, device support, age rating, and a featured image (update_web_game_settings sets them all).`,
             ...usesMultiplayer ? [] : [
               "This build doesn't use Portals.net yet. Games on Portals do better with a multiplayer touch \u2014 even live presence, a shared score race, or in-game chat is a few lines with Portals.net (see the server instructions). Suggest one that fits this game and offer to add it."
@@ -33157,11 +33171,13 @@ function registerTools(server2) {
             "Confirm the MCP is authenticated (call authenticate).",
             "Verify the gameId belongs to this account (call list_web_games).",
             "On PROJECT_BUSY or PROJECT_CHANGED, the project is being edited elsewhere \u2014 close the browser editor and retry.",
+            "On INVALID_PAYLOAD about the tag, nothing was applied \u2014 the label must be one line of 1\u201364 characters. Shorten it or drop it and push again.",
             ...createdGame ? [`The project "${createdGame.title}" (${createdGame.gameId}) was created and kept \u2014 retry the push with that gameId.`] : []
           ],
           {
             directory,
-            ...createdGame ? { created_game_id: createdGame.gameId } : {}
+            ...createdGame ? { created_game_id: createdGame.gameId } : {},
+            ...tag ? { tag } : {}
           }
         );
       }

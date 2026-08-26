@@ -28,16 +28,16 @@ For the full official documentation on one subsystem, use the dedicated skill in
 2. Pull with `pull_web_game_source` before editing unless the user explicitly wants to replace the remote source.
 3. Use a dedicated game directory. A pull overwrites matching project files, so never target an unrelated repository root or a directory whose ownership is unclear.
 4. Preserve the returned `revision` and pass it as `expectedRevision` to `push_web_game_source`. If the server reports `PROJECT_CHANGED`, stop and reconcile instead of overwriting newer edits.
-5. Inspect and test the local build, then push the directory containing `index.html` at its root.
+5. Inspect and test the local build, then push the directory containing `index.html` at its root. Pass the optional `tag` when the user named a label for the push.
 
 ### New game
 
 1. Call `create_web_game` and retain the returned game ID and editor URL.
 2. Create the game in a dedicated local directory with `index.html` at its root.
 3. Implement and test the game using the bundled platform rules.
-4. Call `push_web_game_source` with the local game directory. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing. Leaderboards work there and in the editor preview, on a separate draft board, so a leaderboard can be tested before publishing.
+4. Call `push_web_game_source` with the local game directory, plus the optional `tag` when the user named a label for the push. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing. Leaderboards work there and in the editor preview, on a separate draft board, so a leaderboard can be tested before publishing.
 5. Use `update_web_game_settings` for publishing metadata and media. Report any remaining publishing requirements returned by the tool.
-6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`, and the optional `tag` when the user named a label for the release.
+6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`. The release inherits the draft's label, so pass a `tag` here only to name that release something different.
 
 ### Settings-only or discovery task
 
@@ -89,12 +89,15 @@ Generated assets spend account credits and cannot be undone. Generate only when 
 - Distinguish a successful source push from publication. A push only updates the private draft; `publish_web_game` is what releases the build to players and lists the game.
 - Treat publishing as an explicit user decision — never publish to finish a build task. It is capped at 10 per day, it replaces what live players get, and this MCP cannot unpublish. When `publish_web_game` returns a checklist of missing metadata, fill it with `update_web_game_settings` and report what changed before retrying.
 
-## Tag a release
+## Tag a build
 
-`publish_web_game` takes an optional `tag`: a one-line label of 1–64 characters that Portals stores on that exact version and shows next to the live version on the game's page at portals.to/my-games. Use it to make a release identifiable — `"boss-fight-v2"`, `"1.4.0"`, a milestone name.
+Both `push_web_game_source` and `publish_web_game` take an optional `tag`: a one-line label of 1–64 characters that Portals shows on the game's page at portals.to/my-games. Use it to make a build identifiable — `"wip-boss-fight"`, `"boss-fight-v2"`, `"1.4.0"`, a milestone name.
 
-- Pass a tag when the user named one or asked for the release to be labelled. Never invent a label they did not ask for, and never guess a version number.
-- The label belongs to one version. The next publish is unlabelled unless it carries its own tag, so a release the user wants tagged needs the tag on that publish call.
-- Report the `tag` the tool returns, not the one requested. It answers with what the release actually stored, which is what a retried publish already holds.
-- A rejected tag fails the whole publish with `INVALID_PAYLOAD` and releases nothing. Shorten a long or multi-line label, or drop it, and publish again.
+- Pass a tag when the user named one or asked for the build to be labelled. Never invent a label they did not ask for, and never guess a version number.
+- **A push labels the draft.** The label describes the source now in the project, so a push without a tag clears the label the previous push left. Tag every push in a labelled series, or the label disappears on the next one.
+- **A publish labels the released version, and inherits the draft's label when it passes no tag of its own.** So tagging the push is enough for the label to follow the build all the way to the live release; pass a tag on the publish only to name that release something different.
+- The release label belongs to one version. A later publish does not keep it — it takes its own tag, or whatever the draft is carrying then.
+- Report the `tag` the tool returns, not the one requested. It answers with what Portals actually stored, which is what a retried call already holds and what inheritance resolved to.
+- A rejected tag fails the whole call with `INVALID_PAYLOAD` — nothing is pushed or released. Shorten a long or multi-line label, or drop it, and call again.
+- A GitHub sync applied at portals.to/my-games replaces the whole source and clears the draft label, so a publish after one is unlabelled unless it passes its own tag.
 - Nothing else consumes the label: it is developer-facing bookkeeping, never shown to players and never used for discovery or versioning.
