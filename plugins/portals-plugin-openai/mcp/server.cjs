@@ -31927,7 +31927,7 @@ async function createShareLink(gameId) {
   return shareUrl.startsWith("/") ? `${API_BASE}${shareUrl}` : shareUrl;
 }
 var publishAttempts = /* @__PURE__ */ new Map();
-async function publishWebGame(gameId, expectedRevision) {
+async function publishWebGame(gameId, expectedRevision, tag) {
   const attemptKey = `${gameId}:${expectedRevision ?? ""}`;
   let operationId = publishAttempts.get(attemptKey);
   if (!operationId) {
@@ -31942,7 +31942,8 @@ async function publishWebGame(gameId, expectedRevision) {
       // an upload draft is never what players receive.
       draftId: ARCADE_EDITOR_DRAFT_ID,
       operationId,
-      ...expectedRevision ? { sourceRevision: expectedRevision } : {}
+      ...expectedRevision ? { sourceRevision: expectedRevision } : {},
+      ...tag ? { tag } : {}
     }
   });
   publishAttempts.delete(attemptKey);
@@ -31953,7 +31954,8 @@ async function publishWebGame(gameId, expectedRevision) {
     slug: data.slug,
     playUrl: data.playerUrl.startsWith("/") ? `${API_BASE}${data.playerUrl}` : data.playerUrl,
     isListed: data.isListed === true,
-    cacheReady: data.cacheReady !== false
+    cacheReady: data.cacheReady !== false,
+    tag: data.tag ?? null
   };
 }
 async function createDevToken(gameId) {
@@ -33568,15 +33570,18 @@ function registerTools(server2) {
         openWorldHint: true,
         destructiveHint: true
       },
-      description: "Publish a web game: release its current source as a new immutable version, make that version the one players get at portals.to/g/<slug>, and list it on Portals for discovery. This is the public release \u2014 everything before it (push_web_game_source, the share link) only ever touched the private draft. It publishes what the last push adopted, so push first and confirm the build plays. Portals requires a complete listing before it will publish: description, genre, device support, age rating, and an uploaded featured image (update_web_game_settings sets all of them); a missing field comes back as a checklist, not a partial publish. Publishing again later ships a new version over the live one. Capped at 10 publishes per day.",
+      description: "Publish a web game: release its current source as a new immutable version, make that version the one players get at portals.to/g/<slug>, and list it on Portals for discovery. This is the public release \u2014 everything before it (push_web_game_source, the share link) only ever touched the private draft. It publishes what the last push adopted, so push first and confirm the build plays. Portals requires a complete listing before it will publish: description, genre, device support, age rating, and an uploaded featured image (update_web_game_settings sets all of them); a missing field comes back as a checklist, not a partial publish. Publishing again later ships a new version over the live one. Capped at 10 publishes per day. An optional `tag` labels the release for the developer's own tracking.",
       inputSchema: {
         gameId: external_exports.string().describe("Web game to publish (from list_web_games)."),
         expectedRevision: external_exports.string().optional().describe(
           "Project revision this publish is meant to ship (the `revision` a push or pull returned). The publish fails instead of releasing source that changed after it \u2014 pass it whenever the revision is known."
+        ),
+        tag: external_exports.string().optional().describe(
+          `Optional label for this release, shown next to the live version on the game's page at portals.to/my-games \u2014 e.g. "boss-fight-v2" or "1.4.0". One line, 1\u201364 characters. It belongs to this version alone: the next publish is unlabelled unless it passes its own tag. Pass it only when the user named a label or asked for the release to be tagged; never invent one.`
         )
       }
     },
-    async ({ gameId: rawGameId, expectedRevision }) => {
+    async ({ gameId: rawGameId, expectedRevision, tag }) => {
       try {
         const gameId = rawGameId?.trim();
         if (!gameId) {
@@ -33588,10 +33593,14 @@ function registerTools(server2) {
             ["Call list_web_games to find the gameId."]
           );
         }
-        const published = await publishWebGame(gameId, expectedRevision?.trim() || void 0);
+        const published = await publishWebGame(
+          gameId,
+          expectedRevision?.trim() || void 0,
+          tag?.trim() || void 0
+        );
         return successResult(
           "publish_web_game",
-          published.becameLive ? `Published web game ${gameId} as version ${published.publishedVersion} \u2014 live at ${published.playUrl}.` : `Version ${published.publishedVersion} of web game ${gameId} was released, but version ${published.version} is what players get.`,
+          published.becameLive ? `Published web game ${gameId} as version ${published.publishedVersion}${published.tag ? ` (${published.tag})` : ""} \u2014 live at ${published.playUrl}.` : `Version ${published.publishedVersion} of web game ${gameId} was released, but version ${published.version} is what players get.`,
           {
             game_id: gameId,
             slug: published.slug,
@@ -33601,10 +33610,14 @@ function registerTools(server2) {
             became_live: published.becameLive,
             is_listed: published.isListed,
             cache_ready: published.cacheReady,
+            tag: published.tag,
             editor_url: editorUrl(gameId)
           },
           [
             `Anyone can play it at ${published.playUrl} \u2014 no share link and no sign-in needed.`,
+            ...published.tag ? [
+              `This release is labelled "${published.tag}" on the game's page at portals.to/my-games. The label stays with this version \u2014 the next publish needs its own tag.`
+            ] : [],
             ...published.isListed ? ["It is listed on Portals, so players can find it through browse and search."] : [
               "It is not listed for discovery yet: the automated listing review has to approve this version first. The play link works the whole time; check back with list_web_games."
             ],
@@ -33624,9 +33637,14 @@ function registerTools(server2) {
             "On PUBLISH_OPERATION_CONFLICT, the source changed after the revision passed as expectedRevision \u2014 verify the current build, then publish again with the revision the latest push returned.",
             "On RATE_LIMITED, this account hit its 10 publishes per day \u2014 retry tomorrow.",
             "On PROJECT_ARCHIVED, unarchive the game in My Games first.",
+            "On INVALID_PAYLOAD about the tag, nothing was published \u2014 the label must be one line of 1\u201364 characters. Shorten it or drop it and publish again.",
             "Paid games additionally need a payout-ready Stripe account connected in Monetization settings."
           ],
-          { game_id: rawGameId, ...expectedRevision ? { expected_revision: expectedRevision } : {} }
+          {
+            game_id: rawGameId,
+            ...expectedRevision ? { expected_revision: expectedRevision } : {},
+            ...tag ? { tag } : {}
+          }
         );
       }
     }

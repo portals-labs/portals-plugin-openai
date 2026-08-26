@@ -1,6 +1,6 @@
 ---
 name: portals-pose-tuner
-description: Tune procedural animation live inside a Portals web game with the Pose Tuner dev tool — carry tables, grip offsets, recoil shares, forced pose inputs, and a 3D gizmo for bone rotations, bone positions and held-weapon placement, exported as a paste-ready diff or a boneAdjust map. Use when tuning aimWeapon numbers, weapon carry or ADS poses, boneAdjust maps, ragdoll or IK constants, or any hand-tuned animation table; when a game needs createPoseTuner, _portals/dev/pose-tuner.js, attachBoneEditor, tuner.apply, tuner.dt, tuner.table, or avatars.onAfterUpdate; and when adding the free-cam and no-pause-screen support a tuning session requires.
+description: Tune procedural animation live inside a Portals web game with the Pose Tuner dev tool — carry tables, grip offsets, recoil shares, forced pose inputs, and a 3D gizmo for bone rotations, bone positions and held-weapon placement, exported as a paste-ready diff or a boneAdjust map. Use when tuning aimWeapon numbers, weapon carry or ADS poses, boneAdjust maps, ragdoll or IK constants, or any hand-tuned animation table; when placing a gun, torch, tool, thrown item or any other held or pickable object in the character's hand; when a game needs createPoseTuner, _portals/dev/pose-tuner.js, attachBoneEditor, targets/fold, tuner.apply, tuner.dt, tuner.table, or avatars.onAfterUpdate; and when adding the free-cam and no-pause-screen support a tuning session requires.
 ---
 
 # Pose Tuner
@@ -39,6 +39,36 @@ const dt = tuner?.dt(rawDt) ?? rawDt;                // pause / single-step / sl
 ```js
 avatars.onAfterUpdate(() => tuner?.boneEditor?.update());
 ```
+
+## Register every gun and pickable object as a target
+
+Bones are only half of a hold. A weapon's look is its **mount transform** — where it sits in the hand and how it is angled — as much as the arm pose behind it, and the same is true of anything the character picks up: a torch, a tool, a thrown object, a carried crate. Those live in game tables, not on the skeleton, so the gizmo reaches them through `targets`. Register **every** weapon and pickable prop the game can hold; one left out is one whose numbers still have to be guessed by hand.
+
+```js
+tuner.attachBoneEditor({
+  /* … */
+  targets: [
+    { id: 'rifleMount', label: 'rifle', mode: 'translate',
+      getObject: () => heldWeapon?.model,
+      fold: (obj, poseId) => { MOUNTS[poseId].pos.copy(obj.position); } },
+    { id: 'rifleAngle', label: 'rifle angle', mode: 'rotate',
+      getObject: () => heldWeapon?.model,
+      fold: (obj, poseId) => { MOUNTS[poseId].rot.copy(obj.rotation); } },
+    { id: 'torch', label: 'torch', mode: 'translate',
+      getObject: () => props.torch,
+      fold: (obj, poseId) => { PROP_MOUNTS.torch[poseId].copy(obj.position); } },
+  ],
+});
+```
+
+Four rules that make targets behave:
+
+- **`getObject()` is called fresh each time — return the current object, never a captured reference.** Held items get swapped, re-parented and destroyed; a stale handle picks a weapon that is no longer in the hand. Returning `undefined` when nothing is held is fine, the target just is not pickable.
+- **`fold` writes the game's table, it does not keep the drag.** The tuner deliberately lets the game re-apply that table on the next frame — the same trick the bones use, and what keeps a drag stable instead of fighting the pose code. A `fold` that mutates the object and writes nothing back snaps to nothing.
+- **A target declares one `mode`.** To move *and* rotate the same object, register two entries against the same `getObject`, as above.
+- **Bind the table it folds into with `tuner.table()` too.** Sliders bound that way refresh after every fold, so the gizmo and the numbers stay one view of one value — and the drag lands in `Copy changes` with everything else.
+
+`fold` receives `(object, poseId, mode)`, and `poseId` is whichever stance is active, so one target covers the hip mount, the ADS mount and every other pose as long as it folds into a per-pose table.
 
 ## Two things the game MUST add while the tuner is on
 

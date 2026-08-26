@@ -37,7 +37,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 3. Implement and test the game using the bundled platform rules.
 4. Call `push_web_game_source` with the local game directory. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing. Leaderboards work there and in the editor preview, on a separate draft board, so a leaderboard can be tested before publishing.
 5. Use `update_web_game_settings` for publishing metadata and media. Report any remaining publishing requirements returned by the tool.
-6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`.
+6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`, and the optional `tag` when the user named a label for the release.
 
 ### Settings-only or discovery task
 
@@ -88,3 +88,13 @@ Generated assets spend account credits and cannot be undone. Generate only when 
 - Summarize the game ID, local directory, resulting revision, and editor/share/play URLs returned by the tools. `get_web_game_share_link` re-fetches the shareable draft link when it is needed outside a push.
 - Distinguish a successful source push from publication. A push only updates the private draft; `publish_web_game` is what releases the build to players and lists the game.
 - Treat publishing as an explicit user decision — never publish to finish a build task. It is capped at 10 per day, it replaces what live players get, and this MCP cannot unpublish. When `publish_web_game` returns a checklist of missing metadata, fill it with `update_web_game_settings` and report what changed before retrying.
+
+## Tag a release
+
+`publish_web_game` takes an optional `tag`: a one-line label of 1–64 characters that Portals stores on that exact version and shows next to the live version on the game's page at portals.to/my-games. Use it to make a release identifiable — `"boss-fight-v2"`, `"1.4.0"`, a milestone name.
+
+- Pass a tag when the user named one or asked for the release to be labelled. Never invent a label they did not ask for, and never guess a version number.
+- The label belongs to one version. The next publish is unlabelled unless it carries its own tag, so a release the user wants tagged needs the tag on that publish call.
+- Report the `tag` the tool returns, not the one requested. It answers with what the release actually stored, which is what a retried publish already holds.
+- A rejected tag fails the whole publish with `INVALID_PAYLOAD` and releases nothing. Shorten a long or multi-line label, or drop it, and publish again.
+- Nothing else consumes the label: it is developer-facing bookkeeping, never shown to players and never used for discovery or versioning.

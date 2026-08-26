@@ -107,7 +107,34 @@ tuner.attachBoneEditor({
 
 - **Bone rotations** are stored per pose as Euler XYZ radians and exported as a `boneAdjust` map — exactly the shape [`avatar.animations.load`](https://portals.to/documentation/web-games/guardian-avatars) takes at clip registration, and applied with the same math, so what you see while dragging is what the baked clip will look like.
 - **Bone positions** are local offsets over the clip, exported separately (`boneAdjust` cannot bake positions — apply them at runtime).
-- **Non-bone targets** — a held weapon's mount, a prop — register as `targets`: the gizmo attaches in translate or rotate mode and every drag calls your `fold(object, poseId, mode)` to convert the dragged transform back into whatever live table your game poses it from.
+- **Non-bone targets** — a held weapon's mount, a prop — register as `targets`: the gizmo attaches in translate or rotate mode and every drag calls your `fold(object, poseId, mode)` to convert the dragged transform back into whatever live table your game poses it from. See below.
+
+### Register every gun and pickable object
+
+Bones are only half of a hold. A weapon's look is its **mount transform** — where it sits in the hand and how it is angled — as much as the arm pose behind it, and the same goes for anything the character picks up: a torch, a tool, a thrown object, a carried crate. Those transforms live in your own tables rather than on the skeleton, so the gizmo reaches them through `targets`. Register every weapon and pickable prop the game can hold; one left out is one whose numbers still have to be guessed by hand.
+
+```js
+targets: [
+  { id: 'rifleMount', label: 'rifle', mode: 'translate',
+    getObject: () => heldWeapon?.model,
+    fold: (obj, poseId) => { MOUNTS[poseId].pos.copy(obj.position); } },
+  { id: 'rifleAngle', label: 'rifle angle', mode: 'rotate',
+    getObject: () => heldWeapon?.model,
+    fold: (obj, poseId) => { MOUNTS[poseId].rot.copy(obj.rotation); } },
+  { id: 'torch', label: 'torch', mode: 'translate',
+    getObject: () => props.torch,
+    fold: (obj, poseId) => { PROP_MOUNTS.torch[poseId].copy(obj.position); } },
+]
+```
+
+Each entry is `{ id, label, mode: 'translate' | 'rotate', getObject(), fold(object, poseId, mode) }`, selected in the picker as `@id`. Four rules make them behave:
+
+- **`getObject()` is called fresh on every pick and every frame — return the current object, never a captured reference.** Held items get swapped, re-parented and destroyed; a stale handle edits a weapon that is no longer in the hand. Returning `undefined` when nothing is held is fine — the target simply is not pickable then.
+- **`fold` writes your table; it does not keep the drag.** The tuner deliberately lets your code re-apply that table on the next frame — the same trick the bone edits use, and what keeps a drag stable instead of fighting your pose code. A `fold` that mutates the object without writing anything back snaps to nothing as soon as the game re-poses.
+- **A target declares a single `mode`.** To move *and* rotate the same object, register two entries against the same `getObject`, as above. `mode` is also passed to `fold` as its third argument.
+- **Bind the table it folds into with `tuner.table()` as well.** Sliders bound that way are refreshed after every fold, so the gizmo and the numbers stay one view of one value, and the drag shows up in `Copy changes` with everything else.
+
+`poseId` is whichever stance is active, so a single target covers the hip mount, the ADS mount and every other pose — as long as it folds into a per-pose table.
 
 Run the editor's per-frame pass in the post-mixer slot. On Guardian SDK 0.42.0 and later, register it once and the ordering is the SDK's promise:
 
