@@ -295,6 +295,6 @@ Only then write game code against those exact SKU strings. Build the shop displa
 
 test_game_economy_purchase exercises all of it against the owner's simulated 10,000-Coin wallet, including success, cancellation, insufficient balance, retryable failure, consume, and refund/revocation behavior. It creates a fresh operation ID per action, so consume idempotency is verified separately in game code or automated tests by repeating the same gameplay event ID. A cancelled purchase resolves normally with status "cancelled"; it is not an error, and treating it as one is the usual bug.
 
-Drafted products reach players only after Portals reviews the catalog and the game is published, and live purchases additionally need the owner's monetization readiness — verified email, Stripe identity, account standing — which is visible only at portals.to/my-games.
+Portals review approval releases the exact approved draft: real-Coin purchases then work in draft launches — the editor preview and the staging share link — before any publish, and publishing captures the approved catalog into the immutable live release. A draft edit closes draft selling until the next approval. Real purchases additionally need the owner's monetization readiness — verified email, Stripe identity, account standing — which is visible only at portals.to/my-games.
 
 Full docs: https://portals.to/documentation/web-games/portals-sdk, https://portals.to/documentation/web-games/multiplayer-and-voice and https://portals.to/documentation/web-games/guardian-avatars

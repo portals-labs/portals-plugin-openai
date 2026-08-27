@@ -35152,7 +35152,7 @@ ${htmlSnippet}`,
         // Retiring a SKU is permanent — it can never be re-created for this game.
         destructiveHint: true
       },
-      description: "Add, edit, or retire one in-game product in a web game's draft catalog. Products are what Portals.economy.purchase(sku) can sell: a `durable` is owned once (no-ads, a character), a `consumable` grants a stackable quantity the game spends with Portals.economy.consume(). Editing writes to the DRAFT catalog only \u2014 drafted changes reach players after Portals reviews the catalog and the owner publishes the game, so nothing here changes what a live game charges today. Retiring is permanent: the SKU is burned for this game's lifetime and cannot be re-created, because players who bought it keep an entitlement that must keep resolving. Prices are in Coins, 10\u20135,400 per product.",
+      description: "Add, edit, or retire one in-game product in a web game's draft catalog. Products are what Portals.economy.purchase(sku) can sell: a `durable` is owned once (no-ads, a character), a `consumable` grants a stackable quantity the game spends with Portals.economy.consume(). Editing writes to the DRAFT catalog only \u2014 a drafted change becomes purchasable once Portals review approves it (approval releases the exact approved draft for editor-preview and staging-link launches; publishing captures it into the live release), and an edit closes draft selling until the next approval, so nothing here changes what a live game charges today. Retiring is permanent: the SKU is burned for this game's lifetime and cannot be re-created, because players who bought it keep an entitlement that must keep resolving. Prices are in Coins, 10\u20135,400 per product.",
       inputSchema: {
         gameId: external_exports.string().describe("Web game whose catalog to change (from list_web_games)."),
         action: external_exports.enum(["upsert", "retire"]).describe(
@@ -35448,18 +35448,22 @@ function catalogNextSteps(catalog) {
   const steps = [];
   if (catalog.activeCatalogRevision === null) {
     steps.push(
-      "No catalog is live yet \u2014 purchases only reach players once Portals reviews the draft and the game is published."
+      "No catalog is live yet \u2014 Portals review approval opens real purchases in draft launches (editor preview and staging link), and publishing the game captures the approved catalog into the live release."
     );
   } else if (catalog.draftRevision !== catalog.activeCatalogRevision) {
     steps.push(
-      `Draft revision ${catalog.draftRevision} is ahead of the live catalog (${catalog.activeCatalogRevision}) \u2014 players still get the live one until the game is published again.`
+      `Draft revision ${catalog.draftRevision} is ahead of the live catalog (${catalog.activeCatalogRevision}) \u2014 live players still get the live one until the game is published again; once this draft is review-approved it sells in draft launches immediately.`
     );
   }
   if (catalog.draftReviewStatus === "rejected") {
     steps.push("The draft was rejected in review \u2014 the owner can read why at portals.to/my-games.");
+  } else if (catalog.draftReviewStatus === "approved") {
+    steps.push(
+      "The current draft is review-approved \u2014 it is already purchasable with real Coins in draft launches (editor preview and staging link); any draft edit closes that until the next approval."
+    );
   }
   steps.push(
-    "Live purchases also need the owner's monetization readiness (verified email, Stripe identity, account standing), which is only visible at portals.to/my-games."
+    "Real purchases also need the owner's monetization readiness (verified email, Stripe identity, account standing), which is only visible at portals.to/my-games."
   );
   return steps;
 }
@@ -35741,7 +35745,7 @@ Only then write game code against those exact SKU strings. Build the shop displa
 
 test_game_economy_purchase exercises all of it against the owner's simulated 10,000-Coin wallet, including success, cancellation, insufficient balance, retryable failure, consume, and refund/revocation behavior. It creates a fresh operation ID per action, so consume idempotency is verified separately in game code or automated tests by repeating the same gameplay event ID. A cancelled purchase resolves normally with status "cancelled"; it is not an error, and treating it as one is the usual bug.
 
-Drafted products reach players only after Portals reviews the catalog and the game is published, and live purchases additionally need the owner's monetization readiness \u2014 verified email, Stripe identity, account standing \u2014 which is visible only at portals.to/my-games.
+Portals review approval releases the exact approved draft: real-Coin purchases then work in draft launches \u2014 the editor preview and the staging share link \u2014 before any publish, and publishing captures the approved catalog into the immutable live release. A draft edit closes draft selling until the next approval. Real purchases additionally need the owner's monetization readiness \u2014 verified email, Stripe identity, account standing \u2014 which is visible only at portals.to/my-games.
 
 Full docs: https://portals.to/documentation/web-games/portals-sdk, https://portals.to/documentation/web-games/multiplayer-and-voice and https://portals.to/documentation/web-games/guardian-avatars`;
 

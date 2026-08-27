@@ -40,10 +40,12 @@ The kind is fixed once the SKU is drafted, because it decides what ownership mea
 ### Lifecycle
 
 ```
-draft  ──review──▶  approved  ──publish game──▶  live for players
+draft  ──review──▶  approved (sellable in draft launches)  ──publish game──▶  live for players
 ```
 
-Edits land in the **draft** catalog. A draft carries a `draftRevision`, which is an optimistic-concurrency token: write with the revision you last read, and a change made in between fails with `DRAFT_CONFLICT` instead of silently overwriting. Portals reviews the draft, and the reviewed catalog becomes live when the game is next published — so editing the draft never changes what a live game charges today.
+Edits land in the **draft** catalog. A draft carries a `draftRevision`, which is an optimistic-concurrency token: write with the revision you last read, and a change made in between fails with `DRAFT_CONFLICT` instead of silently overwriting.
+
+Approval releases the exact reviewed draft as an immutable catalog of its own: real-Coin purchases then work in **draft launches** — the owner's editor preview and the staging share link — before the game is ever published. Publishing captures the approved catalog into the immutable live release. Any later draft edit or a rejection closes draft selling until the next approval, and never changes what a live game charges today.
 
 **Retirement is permanent.** A retired SKU is withdrawn from sale and its id is burned for the game's lifetime; it cannot be re-created under the same name. Players who already bought it keep their entitlement, and it keeps appearing in their inventory, so code that reads it must go on working.
 
@@ -162,9 +164,8 @@ Rejections carry a `code`. The ones worth branching on:
 | `INSUFFICIENT_ENTITLEMENT` | `consume()` asked for more than the player holds. |
 | `ENTITLEMENT_KIND_MISMATCH` | `consume()` was called on a durable. Durables are owned, not spent. |
 | `DAILY_GAME_LIMIT` / `DAILY_GLOBAL_LIMIT` | Player spend caps — 13,500 Coins in one game, 27,000 across Portals, per day. Reachable by a player who *does* have the Coins. |
-| `PRODUCT_NOT_FOUND` / `CATALOG_NOT_FOUND` | The SKU is not in the released catalog. A code/catalog mismatch, not a player problem. |
-| `ACCESS_REQUIRED` | The player lacks access to the game. |
-| `SELF_PURCHASE` | The game's own owner cannot buy from it. Use the sandbox to test instead. |
+| `PRODUCT_NOT_FOUND` / `CATALOG_NOT_FOUND` | The SKU is not in the released catalog — or, in a draft launch, the current draft has no operator approval yet. A code/catalog mismatch, not a player problem. |
+| `ACCESS_REQUIRED` | The player lacks access to the game, or the launch (or the approved draft behind a draft launch) is no longer current. |
 | `ECONOMY_UNAVAILABLE` / `NOT_READY` | Purchases are not enabled for this game or host. See *When purchases are blocked*. |
 | `CONTROL_BLOCKED` | Portals has frozen purchasing for this game or account. |
 | `RATE_LIMITED` | Carries `retryAfter` in seconds. |
@@ -194,11 +195,15 @@ Its value is the failure paths. `scenario` forces the outcome:
 
 Test at minimum: a successful purchase grants exactly once; a cancelled purchase grants nothing and shows no error; a repeated `consume()` with the same `operationId` spends once.
 
+## Testing with real Coins
+
+Once the draft catalog is approved, the editor preview and the staging share link run the real economy against the approved draft — the full confirmation UI, real Coin debits, real inventory. An owner buying from their own game is a supported **test purchase**: the owner pays real Coins, Portals retains the full price, and the creator earns nothing from it. Purchases made during draft launches are ordinary entitlements — players keep them when the game is published.
+
 ## When purchases are blocked
 
-A live purchase needs more than correct code. All of the following must hold, and none of it is visible to the MCP:
+A real purchase needs more than correct code. All of the following must hold, and none of it is visible to the MCP:
 
-- The game is published, with a reviewed catalog live on the current release.
+- The catalog is operator-approved for the launch being played: the reviewed catalog captured on the current release for a live play, or the approved current draft for an editor-preview or staging-link play. A draft edit after approval closes draft purchases until the next approval.
 - The owner's email is verified and their Stripe identity verification is complete.
 - The owner's account is in good standing, with no purchase freeze on the account or the game.
 - The owner's account is included in the current rollout — in-game purchases are still being opened to creators in stages.

@@ -19,7 +19,7 @@ A game can only sell a **SKU that exists in its catalog**, authored per game and
 4. Write game code against those exact SKU strings.
 5. `test_game_economy_purchase` — run it against the owner's simulated wallet.
 
-Drafted products reach players only after Portals reviews the catalog **and** the owner publishes the game. Editing the draft never changes what a live game charges today.
+Portals review approval **releases the exact approved draft**: from that moment real-Coin purchases work in draft launches — the editor preview and the staging share link — before any publish. Publishing then captures the approved catalog into the immutable live release. Editing the draft closes draft selling until the next approval, and never changes what a live game charges today.
 
 When the user asks to add microtransactions, call these tools yourself; do not send them to My Games for ordinary draft setup. If they did not specify every field, form a small coherent proposal from the requested game design and state the SKU/price/kind/grant/limit assumptions. Confirm a new SKU and its kind before its first upsert because both are permanent catalog identity choices; then perform the catalog writes yourself. Read before every write, preserve all intended fields because upsert replaces the whole product, and carry the returned revision into the next write. A permanent retirement still requires explicit intent.
 
@@ -74,7 +74,7 @@ lives = result.quantity;   // remaining, after the operation
 
 ## When purchases are blocked
 
-`ECONOMY_UNAVAILABLE` or `NOT_READY` from a live game is usually not a code bug. Live purchases additionally require the owner's monetization readiness — verified email, Stripe identity verification, account in good standing, a published game with a reviewed live catalog — and access is still rolling out to creators in stages. None of that is visible to the MCP by design; the owner reads it at **portals.to/my-games → Economy**. Say so plainly rather than rewriting working purchase code.
+`ECONOMY_UNAVAILABLE` or `NOT_READY` from a hosted game is usually not a code bug. Real purchases additionally require the owner's monetization readiness — verified email, Stripe identity verification, account in good standing, and an operator-approved catalog: the reviewed catalog on the current release for live plays, or the approved current draft for editor-preview and staging-link plays — and access is still rolling out to creators in stages. None of that is visible to the MCP by design; the owner reads it at **portals.to/my-games → Economy**. Say so plainly rather than rewriting working purchase code.
 
 ## Related
 
