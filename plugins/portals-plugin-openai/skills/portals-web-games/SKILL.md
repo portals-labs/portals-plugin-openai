@@ -36,13 +36,14 @@ For the full official documentation on one subsystem, use the dedicated skill in
 2. Create the game in a dedicated local directory with `index.html` at its root.
 3. Implement and test the game using the bundled platform rules.
 4. Call `push_web_game_source` with the local game directory, plus the optional `tag` when the user named a label for the push. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing. Leaderboards work there and in the editor preview, on a separate draft board, so a leaderboard can be tested before publishing.
-5. Use `update_web_game_settings` for publishing metadata and media. Report any remaining publishing requirements returned by the tool.
+5. Use `update_web_game_settings` for publishing metadata and media, including **player support** — `multiplayer` with `maxPlayers` (2–100) and `multiplayerMode` (competitive or coop) for a multiplayer game, or `multiplayer: false` for singleplayer. Publishing requires it, and parties only discover multiplayer games that declare it. Report any remaining publishing requirements returned by the tool.
 6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`. The release inherits the draft's label, so pass a `tag` here only to name that release something different.
 
 ### Settings-only or discovery task
 
 - Use `list_web_games` before acting when the game ID is not already known.
 - Use `update_web_game_settings` without pulling source when the request only changes metadata or media.
+- **Player support** (`multiplayer`, `maxPlayers`, `multiplayerMode`) is settable through `update_web_game_settings`. Portals uses the values live at the last publish, so tell the user a publish is needed for players to see a change. **Matchmaking profiles** (managed lobbies) are not settable through the tool — direct the user to the game's settings page at portals.to/my-games.
 - **Latency-sensitive multiplayer** (region-based servers for fast-paced games instead of the default one worldwide US room) is not settable through `update_web_game_settings` — direct the user to the toggle on the game's settings page at portals.to/my-games. The `portals-multiplayer-and-voice` skill explains the routing.
 - Do not mutate source or settings when the user only asks to inspect or explain.
 

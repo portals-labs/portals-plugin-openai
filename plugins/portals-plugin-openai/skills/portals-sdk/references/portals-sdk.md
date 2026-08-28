@@ -38,7 +38,7 @@ async function start() {
 start().catch(console.error);
 ```
 
-`session.context` is `standalone` on a game page and `room` when the same game is open inside a Portals room.
+`session.context` is `standalone` on a game page and `room` when the same game is open inside a Portals room. `session.matchmaking` is non-null when the player arrived through a Portals-managed lobby — see [managed lobbies](https://portals.to/documentation/web-games/multiplayer-and-voice#managed-lobbies-and-matchmaking).
 
 ## Leave room for Portals controls
 

@@ -91,6 +91,57 @@ The game still owns what happens after that player arrives. Multiplayer games mu
 
 Portals cannot see a private sub-lobby name chosen only inside the game with `net.join({ channel })`. If late party members must follow a particular match, put its stable match code in the game-page URL (`?channel=match-x7q2`) and call `net.join()` without another subchannel, or derive the nested channel deterministically from that URL. Do not generate a one-off nested channel that only the first player's tab knows.
 
+## Declare player support
+
+Every game declares whether it is singleplayer or multiplayer, and a multiplayer game declares how many players it supports and whether they compete or cooperate. The declaration lives in the game's settings in My Games — the same settings that hold matchmaking profiles — and **publishing requires it**: a publish without the declaration fails with "Choose whether this game is singleplayer or multiplayer (and its max players) before publishing."
+
+| Field | Values | Notes |
+|---|---|---|
+| Player support | singleplayer or multiplayer | The form defaults to singleplayer. Switch it before publishing a multiplayer game, or the game is declared singleplayer and never reaches parties. |
+| Max players | 2–100 | Multiplayer only. A singleplayer declaration always normalizes to 1. |
+| Mode | competitive or co-op | Multiplayer only. |
+
+What Portals does with the declaration:
+
+- **Party discovery.** A party of two or more sees a "multiplayer games for N players" row on Play. A game appears there when it declares multiplayer with a max player count of at least the party size. A game with an enabled matchmaking profile also appears without the declaration, because matchmaking already admits parties by the profile's `maxPartySize` — every other multiplayer game needs the declaration to be found by parties.
+- **Party fit.** A party larger than a game's max player count cannot select that game for the party.
+
+Party discovery reads the values that were live at your last publish, exactly like age rating and device support: change the declaration in settings, then publish a version for players to see it. Games published before the declaration existed have none — open their settings, declare, and republish to put them on the party row.
+
+The declaration is separate from matchmaking profiles. Profiles govern how a managed lobby fills and starts, and their `maxPartySize` and `teamSize` decide how many friends can enter a managed match together; the declaration is the discovery contract that says what kind of game this is. Declare player support on every multiplayer game, whether or not it uses managed matchmaking.
+
+## Managed lobbies and matchmaking
+
+A multiplayer game can hand its whole lobby flow to Portals. When a game has **matchmaking profiles** in its settings, Portals runs the lobby experience outside the game: players browse open lobbies (player count, region, gamemode), start their own public or private lobby with a region choice, and a party leader's pick brings the whole party into one session. The game builds none of that UI — it receives players already routed to the right server.
+
+Each profile is one gamemode in the lobby list: its player-facing name, which visibilities are allowed (public, private, or both), min/max players and team size, whether the lobby appears in the server browser, whether players may join a match already in progress, and its start policy — `leader` (the lobby creator starts the match when ready) or `automatic` (the match starts itself once enough players are in). Profiles live in the game's settings (`matchmakingProfiles`), set through the same settings tooling used to publish the game; there is nothing to configure from game code.
+
+Two of those fields interact in a way that matters: **a party must fit inside one team**, so `teamSize` — not `maxPlayers` — is the effective cap on how many friends can enter together, and `maxPartySize` can never exceed it. For a free-for-all game, set `teamSize` equal to `maxPlayers` (one "team" that is simply the room) and give `maxPartySize` the same value unless you want a lower cap on group joins; leaving a team-shaped `teamSize` on an FFA quietly rejects larger parties with "that game does not support this party size" even though the match has room. Team assignment is not yet visible to game code, so for now `teamSize` has no effect beyond this seating rule.
+
+**Managed lobbies admit guests.** A signed-out visitor on the game page sees the real lobby list and can join an open *public* lobby without an account (hosting a lobby, private lobbies, and mature or paid games still require signing in). Those players arrive in your session like any other, but with `playerId: null` and no `displayName` or `avatarUrl` — the same shape as an unsigned player in a casual session — so a managed match cannot assume everyone can save progress, submit scores, or buy products. Show a sensible name such as "guest", keep the match fully playable for them, and offer `Portals.identity.requestLogin()` from a click for anything that needs an account.
+
+### What a managed match changes in the game
+
+Detect it, then join plainly:
+
+```js
+await Portals.ready();
+const match = await Portals.matchmaking.current();
+// null in a casual session; in a managed match:
+// { managed: true, visibility: "public" | "private",
+//   phase: "starting" | "in_progress", region: "us-east-2" }
+
+const session = await Portals.net.join(); // no channel, no region
+```
+
+- **Join at page load, not behind a click.** In a managed match the party is landing together, so a title screen that waits for a click holds everyone else's match start hostage. Boot and call `net.join()` immediately; if you synthesize audio, unlock the AudioContext on the player's first real input instead of gating the whole game on one.
+- **Pass no `channel` or `region`.** The matchmaker's assignment is authoritative: in a managed match both options are ignored, and the session's region is reported back in the matchmaking context. Match codes, `?channel=` conventions, and region pins are casual-session tools.
+- **Never fall back to local play.** A failed managed join means this player is missing from a real shared match. Show the error with a retry or reload; do not drop into a solo, bots, or same-browser-tabs mode the way a casual game might. The join deadline is longer in managed matches (60 seconds instead of 10) because the platform may be waking a server for a brand-new lobby — do not wrap `net.join()` in a shorter timeout of your own.
+- **Design a warm-up for `phase: "starting"`.** A leader-start lobby sits open while it fills: players are already inside your game during that time, so give them somewhere to run around, see the controls, and warm up. `Portals.matchmaking.onChange()` fires when the phase flips to `"in_progress"`.
+- **Expect late joiners when join-in-progress is on.** Lobby browsers route players into running matches; the same late-join rules as above apply — handle `playerjoin` mid-match and reconstruct state from `join().state`.
+
+Party members joining through the party UI, lobby-list joins, and mid-match backfill all arrive through the same `net.join()` — a game that follows this section needs no special cases per entry path.
+
 ## Broadcast messages
 
 `net.send(data)` broadcasts up to 8 KB of JSON to the **other** players — your own client does not receive its own broadcast:
@@ -300,7 +351,7 @@ curl -X POST https://portals.to/api/v2/arcade/dev-token \
   -d '{"gameId":"YOUR_GAME_ID"}'
 ```
 
-The SDK itself is served at [portals.to/portals-sdk/sdk.js](/portals-sdk/sdk.js). Download it into your project at `_portals/sdk.js` — the same path publishing stamps it to, so your HTML works unchanged locally and on Portals (downloaded projects already have it there):
+The SDK itself is served at [portals.to/portals-sdk/sdk.js](https://portals.to/portals-sdk/sdk.js). Download it into your project at `_portals/sdk.js` — the same path publishing stamps it to, so your HTML works unchanged locally and on Portals (downloaded projects already have it there):
 
 ```sh
 mkdir -p _portals && curl -o _portals/sdk.js https://portals.to/portals-sdk/sdk.js
@@ -337,6 +388,8 @@ What to know:
 | `net.getState(key?)` | Reads one key, or the full state object, from the local mirror. |
 | `net.players()` / `net.self()` | Read the live roster / own player synchronously. |
 | `net.on(event, handler)` / `net.off(event, handler)` | Subscribe to `message`, `playerjoin`, `playerleave`, `state`, `status`. |
+| `matchmaking.current()` | Resolves to the managed-match context `{ managed, visibility, phase, region }`, or `null` in a casual session. |
+| `matchmaking.onChange(listener)` | Subscribes to managed-match lifecycle changes (e.g. `starting` → `in_progress`); returns an unsubscribe. |
 | `voice.join(options?)` | Joins voice; Portals asks the player for the microphone. Resolves to `{ self, participants, muted }`. |
 | `voice.leave()` | Leaves voice chat. |
 | `voice.setMuted(muted)` / `voice.muted()` | Toggle / read the local microphone mute. |
