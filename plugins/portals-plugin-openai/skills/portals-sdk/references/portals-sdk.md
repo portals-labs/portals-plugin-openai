@@ -164,13 +164,14 @@ await Portals.saveState({
 
 ## Submit and read casual scores
 
-Scores require sign-in. Higher values rank first and only the best score for each player and mode is kept.
+Scores require sign-in. Higher values rank first and, by default, only the best score for each player and mode is kept. Pass `{ replace: true }` as the third argument to store a score even when it is lower than the player's stored one — for a game whose score can legitimately go down.
 
 Draft play — the editor preview and a shared `?draft=` link — reads and writes a separate draft leaderboard, so you can play a board through before publishing without preview scores ever reaching the published game's ranking.
 
 ```js
 await Portals.submitScore(1250);
 await Portals.submitScore(48, "daily");
+await Portals.submitScore(12, "daily", { replace: true });
 ```
 
 A mode may contain lowercase letters, numbers, and hyphens and may be at most 32 characters. Omit it to use `default`.
@@ -196,7 +197,7 @@ The limit defaults to 10 and may be from 1 to 100. Each row contains:
 | `playerId`    | Stable identifier scoped to this game.      |
 | `displayName` | Current public display name, or `null`.     |
 | `avatarUrl`   | Current public avatar URL, or `null`.       |
-| `score`       | Best submitted score for the selected mode. |
+| `score`       | Stored score for the selected mode.         |
 
 Game scores are client-reported and intended for social and casual competition. Never use them to award currency, paid prizes, access, or another valuable entitlement.
 
@@ -220,9 +221,11 @@ The current host decides how to close the game and restore player controls.
 | `Portals.avatar.openPicker()`                         | Opens trusted global avatar UI and resolves to the refreshed profile.   |
 | `Portals.identity.requestLogin()`                     | Opens Portals sign-in when needed and resolves to the signed-in player. |
 | `Portals.identity.onChange(listener)`                 | Subscribes to player changes and returns an unsubscribe function.       |
+| `Portals.matchmaking.current()`                       | Resolves to the managed-match context, or `null` in a casual session.   |
+| `Portals.matchmaking.onChange(listener)`              | Subscribes to managed-match phase changes; returns an unsubscribe.      |
 | `Portals.saveState(data)`                             | Saves JSON state for the signed-in player.                              |
 | `Portals.loadState()`                                 | Loads JSON state or returns `null`.                                     |
-| `Portals.submitScore(score, mode?)`                   | Keeps the player's highest casual score for a mode.                     |
+| `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the highest unless `{ replace: true }`.   |
 | `Portals.getLeaderboard(options?)`                    | Reads up to 100 top casual scores.                                      |
 | `Portals.economy.getCatalog()`                        | Reads products frozen into the current release.                         |
 | `Portals.economy.getInventory()`                      | Reads this player's game-specific entitlements.                         |

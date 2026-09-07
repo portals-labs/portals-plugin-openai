@@ -33394,7 +33394,7 @@ function registerTools(server2) {
         openWorldHint: true,
         destructiveHint: true
       },
-      description: "Update a web game's properties: title, description, overview, canonical link (slug), featured image, gallery, genre and subgenres, device support, age rating, player support (singleplayer or multiplayer with max players and mode), featured leaderboard, and pricing. Only the fields passed change \u2014 everything else is left alone. The featured image and gallery take local file paths and are uploaded automatically. Slug and pricing are owner authority; pricing (access_mode/price_cents) takes effect when the game is next published, everything else applies to the game page immediately. On a live game, metadata edits re-run the automated listing review.",
+      description: "Update a web game's properties: title, description, overview, canonical link (slug), featured image, gallery, genre and subgenres, device support, age rating, player support (singleplayer or multiplayer with max players and mode), featured leaderboard, and pricing. Only the fields passed change \u2014 everything else is left alone. The featured image and gallery take local file paths and are uploaded automatically. Slug and pricing are owner authority; pricing (access_mode/price_cents) takes effect when the game is next published, everything else applies to the game page immediately. On a live game, metadata edits re-run the automated listing review. Matchmaking profiles (managed lobbies) and the latency-sensitive multiplayer toggle are not settable through this tool.",
       inputSchema: {
         gameId: external_exports.string().describe("Web game to update (from list_web_games)."),
         title: external_exports.string().optional().describe("Game name shown in My Games and on the game's page. 1\u201380 characters."),
@@ -33437,7 +33437,7 @@ function registerTools(server2) {
         deviceSupport: external_exports.enum(["desktop", "mobile", "both"]).nullable().optional().describe("Devices the game plays well on. Required for publishing."),
         ageRating: external_exports.enum(["general", "mature"]).optional().describe("Age rating. Required for publishing; mature (18+) games are hidden from signed-out and underage players."),
         multiplayer: external_exports.boolean().nullable().optional().describe(
-          "Player support: true for a multiplayer game, false for singleplayer. Required for publishing. Send maxPlayers and multiplayerMode with true; false resets both. null clears the declaration. Portals reads the values live at the last publish, so publish again after changing them."
+          "Player support: true for a multiplayer game, false for singleplayer. Required for publishing. Send maxPlayers and multiplayerMode with true; false resets both. null clears the declaration. Portals reads the values live at the last publish, so publish again after changing them (a game published before the declaration existed joins the party row on save, no republish)."
         ),
         maxPlayers: external_exports.number().int().nullable().optional().describe(
           'Most players one session supports, 2\u2013100. Required when multiplayer is true; ignored for singleplayer. Parties larger than this cannot pick the game, and a party of N sees the game under "multiplayer games for N players" only when N fits.'
@@ -35502,7 +35502,7 @@ TypeScript declarations are not part of the game's files \u2014 for a TS project
 - Portals.identity.requestLogin() \u2192 Promise of the signed-in player. Only call from a direct user action (button click). Never ask for passwords in-game.
 - Portals.identity.onChange(listener) \u2192 unsubscribe fn; fires on sign-in/out.
 - Portals.saveState(data) / Portals.loadState() \u2014 per-player persistence; requires sign-in. State must be JSON-serializable and no larger than 64 KB after JSON encoding. loadState resolves to the saved state or null.
-- Portals.submitScore(score, mode?) \u2014 mode defaults to "default"; lowercase letters, numbers, hyphens, max 32 chars.
+- Portals.submitScore(score, mode?, options?) \u2014 mode defaults to "default"; lowercase letters, numbers, hyphens, max 32 chars. Keeps the player's highest score unless options is { replace: true }, which stores the new score even when lower.
 - Portals.getLeaderboard({ mode, limit }?) \u2192 { entries } with rank, playerId, displayName, avatarUrl, score. limit 1\u2013100, default 10. Free games allow unsigned leaderboard reads; paid games require verification first.
 - Portals.quit() \u2014 asks the host to close the game and restore player controls.
 
@@ -35524,7 +35524,7 @@ Sessions run on US servers by default \u2014 one worldwide room per channel, so 
 
 join({ region }) forces a session onto Portals' US or EU servers for every player, wherever they are \u2014 the only values are "us" and "eu", and a pin outranks the player's own location, the game's latency-sensitive setting, and a "global:" prefix. Pin only when the game needs one known location for everyone (a scheduled event, a persistent world, a region its players share); otherwise leave it off, because the default already keeps each player near their server and a pin makes distant players pay the latency. Pass the SAME value for every player of a room: the pin selects which room you join, so mixed pins are separate rooms \u2014 which is also how you would deliberately run a US room and an EU room of one channel. A pin never falls back, so join() rejects if the pinned region has no capacity; keep the solo fallback in the catch.
 
-Every game declares player support before it can publish \u2014 singleplayer, or multiplayer with a max player count (2\u2013100) and a mode (competitive or coop) \u2014 via update_web_game_settings (multiplayer, maxPlayers, multiplayerMode). Parties discover games through it: a party of N sees "multiplayer games for N players" built from games declaring multiplayer with maxPlayers >= N, and a party larger than maxPlayers cannot pick the game. Portals reads the values live at the last publish. A game with matchmaking profiles (managed lobbies, configured on its settings page) is in a managed match when Portals.matchmaking.current() is non-null: call net.join() at page load with no channel or region and never fall back to local play.
+Every game declares player support before it can publish \u2014 singleplayer, or multiplayer with a max player count (2\u2013100) and a mode (competitive or coop) \u2014 via update_web_game_settings (multiplayer, maxPlayers, multiplayerMode). Parties discover games through it: a party of N sees "multiplayer games for N players" built from games declaring multiplayer with maxPlayers >= N, and a party larger than maxPlayers cannot pick the game. Portals reads the values live at the last publish; a game published before the declaration existed reaches the party row as soon as it is declared, no republish. A game with matchmaking profiles (managed lobbies \u2014 game settings written through Portals' authenticated project-settings API, not settable from this tool or game code, and My Games has no form for them yet) is in a managed match when Portals.matchmaking.current() is non-null: call net.join() at page load with no channel or region and never fall back to local play.
 
   const net = Portals.net;
   const session = await net.join();        // { self, players, state } \u2014 a snapshot
@@ -35774,7 +35774,7 @@ Full docs: https://portals.to/documentation/web-games/portals-sdk, https://porta
 var server = new McpServer(
   {
     name: "portals-web-games",
-    version: "0.1.4",
+    version: "0.1.6",
     description: "MCP server for Portals web games \u2014 create browser game projects, push local source to them, and pull their source back down."
   },
   { instructions: SERVER_INSTRUCTIONS }

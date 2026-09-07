@@ -43,7 +43,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 
 - Use `list_web_games` before acting when the game ID is not already known.
 - Use `update_web_game_settings` without pulling source when the request only changes metadata or media.
-- **Player support** (`multiplayer`, `maxPlayers`, `multiplayerMode`) is settable through `update_web_game_settings`. Portals uses the values live at the last publish, so tell the user a publish is needed for players to see a change. **Matchmaking profiles** (managed lobbies) are not settable through the tool — direct the user to the game's settings page at portals.to/my-games.
+- **Player support** (`multiplayer`, `maxPlayers`, `multiplayerMode`) is settable through `update_web_game_settings`. Portals uses the values live at the last publish, so tell the user a publish is needed for players to see a change (the exception is a game published before the declaration existed: declaring it puts it on the party row on save). **Matchmaking profiles** (managed lobbies) are not settable through the tool, and My Games does not expose a form for them yet — they are written through Portals' authenticated project-settings API. Say so plainly instead of pointing the user at a settings page that lacks the section.
 - **Latency-sensitive multiplayer** (region-based servers for fast-paced games instead of the default one worldwide US room) is not settable through `update_web_game_settings` — direct the user to the toggle on the game's settings page at portals.to/my-games. The `portals-multiplayer-and-voice` skill explains the routing.
 - Do not mutate source or settings when the user only asks to inspect or explain.
 
