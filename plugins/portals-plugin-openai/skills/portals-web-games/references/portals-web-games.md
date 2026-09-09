@@ -86,7 +86,7 @@ Availability: Portals.net works on the game page, inside Portals rooms (room ses
 
 Every pushed game also gets the Guardian avatar SDK: the same avatars players wear across Portals — body types, skin/hair/eye colour, hair styles, the wearables system, retargeted locomotion and facial animation, and a first/third-person character controller with the Portals feel. It is a Three.js library, not a renderer: the game owns the scene, camera and render loop. Reach for it instead of hand-rolling a character whenever a 3D game wants a player avatar.
 
-Load it beside the SDK. Both files are managed by Portals and stamped into the bundle on every push — never modify, bundle, or ship your own copy. The stamped SDK is versioned per game (see "Guardian SDK versions and local development" below):
+Load it beside the SDK. Both files are managed by Portals and stamped into the bundle on every push — never modify, bundle, or ship your own copy. The stamped SDK is versioned, and an unpinned push re-stamps it at the current release (see "Guardian SDK versions and local development" below):
 
   <script src="./_portals/sdk.js"></script>
   <script src="./_portals/guardians-sdk.js"></script>
@@ -217,7 +217,7 @@ TypeScript declarations for editor autocomplete: curl -o guardians.d.ts https://
 
 ## Guardian SDK versions and local development
 
-The avatar SDK is released in versions, and a game is frozen on the version it was first pushed with — later pushes and newer platform releases never change the avatar SDK under a working game. To move to a different released version, pin it in a portals.json at the project root and push:
+The avatar SDK is released in versions. Only games built in the Portals editor or AI builder are frozen on the version they were first stamped with. A push (like a zip import or GitHub build) replaces the whole bundle and re-stamps the SDK at the current platform release, so an unpinned pushed game can change SDK version on any push. Pin the version in a portals.json at the project root and push — the pin wins on every path:
 
   { "guardiansSdk": "0.20.0" }
 

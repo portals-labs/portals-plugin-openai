@@ -20,7 +20,7 @@ That gives you the global `PortalsGuardians`. Wait for it the same way you wait 
 const { PortalsAvatars } = await PortalsGuardians.ready();
 ```
 
-`ready()` is required — the global exists immediately but its exports are only populated once the module lands. Do not edit `_portals/guardians-sdk.js`; Portals manages that copy. Your game keeps the SDK version it was first stamped with — see [Versions](#versions) for how to pin one or develop against it locally.
+`ready()` is required — the global exists immediately but its exports are only populated once the module lands. Do not edit `_portals/guardians-sdk.js`; Portals manages that copy. Which SDK version it holds depends on how the game reaches Portals — see [Versions](#versions) for the rules, how to pin one, and how to develop against it locally.
 
 ### Importing it instead
 
@@ -53,13 +53,18 @@ Only these Three.js addons are hosted: `controls/OrbitControls.js`, `loaders/GLT
 
 ## Versions
 
-The avatar SDK is released in versions. Your game is **frozen on the version it was first stamped with**: publishing again, or a newer platform release, never changes the avatar SDK under a working game. To move to a different released version, pin it in a `portals.json` at your project root:
+The avatar SDK is released in versions. Which version a game runs depends on how it reaches Portals:
+
+- **Editor and AI builder.** The game is **frozen on the version it was first stamped with**: publishing again, or a newer platform release, never changes the avatar SDK under a working game.
+- **Pushes from this plugin, zip imports and GitHub builds.** Each import replaces the whole bundle, so the SDK is stamped at the **current platform release** every time. An unpinned pushed game can change SDK version on any push.
+
+To control the version on every path, pin it in a `portals.json` at the project root:
 
 ```json
 { "guardiansSdk": "0.36.0" }
 ```
 
-The pin travels with the project — through the editor, the AI builder, zip imports and GitHub builds — so the version you developed against is the version that publishes. Pinning a version that was never released fails the publish with an error naming the current release.
+The pin wins everywhere — editor, AI builder, plugin pushes, zip imports and GitHub builds — so the version you developed against is the version that publishes. Pinning a version that was never released fails the publish with an error naming the current release. Always pin a Guardian game you push.
 
 ### Local development
 
