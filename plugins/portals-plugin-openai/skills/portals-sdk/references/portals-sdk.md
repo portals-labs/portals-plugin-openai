@@ -164,7 +164,9 @@ await Portals.saveState({
 
 ## Submit and read casual scores
 
-Scores require sign-in. Higher values rank first and, by default, only the best score for each player and mode is kept. Pass `{ replace: true }` as the third argument to store a score even when it is lower than the player's stored one — for a game whose score can legitimately go down.
+Scores require sign-in. Higher values rank first and, by default, only the best score for each player and mode is kept. Pass `{ replace: true }` as the third argument to store a score even when it is worse than the player's stored one — for a game whose score can legitimately go down.
+
+A mode can rank the other way round. In **My Games → your game → Settings → Leaderboard ranking**, set a mode to **Lowest score** for golf strokes, move counts, or mistakes: the lowest value ranks first and a new submission replaces the player's stored score only when it is lower. A mode can also rank as a time; see [Time leaderboards](#time-leaderboards) below.
 
 Draft play — the editor preview and a shared `?draft=` link — reads and writes a separate draft leaderboard, so you can play a board through before publishing without preview scores ever reaching the published game's ranking.
 
@@ -197,9 +199,54 @@ The limit defaults to 10 and may be from 1 to 100. Each row contains:
 | `playerId`    | Stable identifier scoped to this game.      |
 | `displayName` | Current public display name, or `null`.     |
 | `avatarUrl`   | Current public avatar URL, or `null`.       |
-| `score`       | Stored score for the selected mode.         |
+| `score`       | Stored score for the selected mode. Elapsed milliseconds on a time mode. |
 
 Game scores are client-reported and intended for social and casual competition. Never use them to award currency, paid prizes, access, or another valuable entitlement.
+
+### Time leaderboards
+
+A score is only a number; nothing in `submitScore` says whether it is points or a time. The mode's **ranking**, a setting you own in the creator dashboard, tells Portals how to treat that number. Every mode ranks as **Highest score** until you change it to **Lowest score**, **Shortest time**, or **Longest time**.
+
+**1. Submit a time from your game.** Measure elapsed **milliseconds** and post them to a mode of your choice. Use a dedicated mode for each time board so it never mixes with point scores.
+
+```js
+const startedAt = performance.now();
+
+// ...the player finishes the run...
+
+const elapsedMs = Math.round(performance.now() - startedAt);
+await Portals.submitScore(elapsedMs, "speedrun");
+```
+
+**2. Set the mode's ranking.** Open **My Games → your game → Settings → Leaderboard ranking**. Every mode your game has submitted to is listed, including modes played only in the editor preview or a draft link. Set the mode to **Shortest time** or **Longest time**. The setting autosaves and applies to the live and draft boards immediately.
+
+Do this before you publish. A mode is stored under highest-score rules until you change its ranking, so play the game once in the editor preview to create the mode, set the ranking, then publish.
+
+**3. Portals keeps the right time.** On a shortest-time mode, a new submission replaces the player's stored time only when it is lower; on a longest-time mode, only when it is higher. `{ replace: true }` still stores the posted time regardless, exactly as it does for scores.
+
+**4. The board sorts by the ranking.** `getLeaderboard` and the featured leaderboard on the game page rank a shortest-time mode lowest first and a longest-time mode highest first. Rank 1 is always the winner.
+
+**5. The game page formats the value.** When the featured leaderboard is a time mode, Portals sends the board's ranking together with its rows, and the game page shows each stored value as a time: `83456` becomes `1:23.456`, and times of an hour or more read `h:mm:ss.mmm`. Point boards keep the plain number format.
+
+`getLeaderboard` returns the raw millisecond values and no ranking, so an in-game leaderboard formats them itself:
+
+```js
+const board = await Portals.getLeaderboard({ mode: "speedrun", limit: 10 });
+
+function formatTime(ms) {
+  const total = Math.round(ms);
+  const minutes = Math.floor(total / 60000);
+  const seconds = Math.floor((total % 60000) / 1000);
+  const millis = total % 1000;
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+}
+
+for (const entry of board.entries) {
+  console.log(entry.rank, entry.displayName, formatTime(entry.score));
+}
+```
+
+Always submit milliseconds. A value in seconds still ranks in the right order but displays as a fraction of a second on the game page.
 
 ## Close the game
 
@@ -225,7 +272,7 @@ The current host decides how to close the game and restore player controls.
 | `Portals.matchmaking.onChange(listener)`              | Subscribes to managed-match phase changes; returns an unsubscribe.      |
 | `Portals.saveState(data)`                             | Saves JSON state for the signed-in player.                              |
 | `Portals.loadState()`                                 | Loads JSON state or returns `null`.                                     |
-| `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the highest unless `{ replace: true }`.   |
+| `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the best for the mode's ranking unless `{ replace: true }`. |
 | `Portals.getLeaderboard(options?)`                    | Reads up to 100 top casual scores.                                      |
 | `Portals.economy.getCatalog()`                        | Reads products frozen into the current release.                         |
 | `Portals.economy.getInventory()`                      | Reads this player's game-specific entitlements.                         |
