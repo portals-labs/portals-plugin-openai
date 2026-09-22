@@ -1,6 +1,6 @@
 ---
 name: portals-sdk
-description: Use the Portals SDK in a hosted web game for player identity, Portals sign-in, saved progress, casual scores, leaderboards, the player's public username and playable avatar, and the host-owned game UI safe area. Use when working with the global Portals object, _portals/sdk.js, Portals.ready, Portals.identity.requestLogin, Portals.player.get, Portals.avatar.openPicker, saveState/loadState, submitScore, getLeaderboard, Portals.quit, playerId, standalone vs room host context, or avoiding the persistent top-left Portals controls.
+description: Use the Portals SDK in a hosted web game for player identity, Portals sign-in, saved progress, casual scores, leaderboards, private leaderboards, the player's public username and playable avatar, and the host-owned game UI safe area. Use when working with the global Portals object, _portals/sdk.js, Portals.ready, Portals.identity.requestLogin, Portals.player.get, Portals.avatar.openPicker, saveState/loadState, submitScore, getLeaderboard, session.board, private leaderboard board links, Portals.quit, playerId, standalone vs room host context, or avoiding the persistent top-left Portals controls.
 ---
 
 # Portals SDK
@@ -39,6 +39,7 @@ The host control is outside and above untrusted game code. Never try to hide, re
 - A time mode takes elapsed **milliseconds** (`Math.round(performance.now() - startedAt)`) on a dedicated mode. Play once in the editor preview so the mode exists, then set its ranking before publishing — a mode ranks as highest-score until changed. `getLeaderboard` returns raw milliseconds and no ranking, so an in-game board formats them itself; the game page formats a time mode as `m:ss.mmm`.
 - Scores are client-reported. Never use them to award currency, paid prizes, access, or any other valuable entitlement.
 - The leaderboard works in draft play too — `submitScore` and `getLeaderboard` are live in the editor preview and behind a shared `?draft=` link. Draft play uses a separate draft board, so test a leaderboard before publishing; those scores never reach the published game's ranking, and the published board starts empty.
+- A creator can create a **private leaderboard** in **My Games → your game → Settings → Private leaderboards** and share its `?board=<name>` play link: every `submitScore` and `getLeaderboard` in that session goes to that board instead of the public one, with no game change needed. Read `(await Portals.ready()).board` — `null` on the public board — only to label it; both calls also take an explicit `{ board }` (lowercase letters, numbers, hyphens, max 64). Only a board the creator created exists, so never invent a board name: any other key silently plays the public board. A session on a private board cannot read the public one.
 - Every async method can reject — no host, invalid request, missing access, network failure. Catch at the player action that caused it and keep the game playable when an optional Portals feature is unavailable.
 - Never put API keys, Firebase tokens, payment details, or signed asset URLs in game code, saved state, score modes, logs, or leaderboard UI.
 

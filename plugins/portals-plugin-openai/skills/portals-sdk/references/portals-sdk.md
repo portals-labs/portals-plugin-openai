@@ -227,6 +227,50 @@ A signed-out player's name reaches a public leaderboard exactly as typed. If you
 
 Paid games are unaffected: a signed-out player cannot purchase access, so they never reach the point of posting a score.
 
+### Private leaderboards
+
+A private leaderboard is a separate ranking for one group of players — a tournament, a classroom, a stream night — while your public board carries on untouched.
+
+**1. Create it.** In **My Games → your game → Settings → Private leaderboards**, create one and give it a name, for example `friday-cup`. A name may use lowercase letters, numbers, and hyphens, must start with a letter or number, and may be at most 64 characters.
+
+**2. Share its link.** The settings page gives you the link to copy:
+
+```
+https://portals.to/g/your-game?board=friday-cup
+```
+
+Everyone who follows that link competes on that board. You do not have to change your game for this — every `submitScore` and `getLeaderboard` call made in that session already goes there.
+
+To label it, read the board from the session:
+
+```js
+const session = await Portals.ready();
+
+if (session.board !== null) {
+  showBanner(`playing the ${session.board} board`);
+}
+```
+
+Your game can also name a board itself, on either call:
+
+```js
+await Portals.submitScore(1250, "daily", { board: "friday-cup" });
+const board = await Portals.getLeaderboard({ mode: "daily", board: "friday-cup" });
+```
+
+A private leaderboard is **unguessable, not secret**. The name is the only thing that reaches it, so treat the link as the invitation: anyone you give it to can read and post there, and a name you publish — in your game's own code, say — is public. Pick something hard to guess for a board that should stay closed.
+
+Some things to know:
+
+- **Only a leaderboard you created exists.** A link naming anything else — a typo, or one you have deleted — plays the **public** board instead. Players are never blocked, but their scores go to the public ranking, so check the name when you share a link and expect old links to feed the public board once you delete a leaderboard.
+- A private leaderboard is never listed on your game's page and can never be the featured board. Its scores are not counted in your leaderboard settings, and `session.board` is the only place a player can see which board they are on.
+- Mode rankings are shared. A mode set to **Shortest time** ranks that way on every board.
+- A session on a private leaderboard stays there. There is no way to read the public board from inside it.
+- Draft play keeps the split: `?draft=` and `?board=` together give you the draft side of that private leaderboard.
+- Deleting one deletes its scores with it.
+- A game may hold up to 50 private leaderboards.
+- A Portals admin resetting your whole leaderboard empties private leaderboards too, without archiving them as a version. The leaderboards themselves survive, so their links keep working.
+
 ### Time leaderboards
 
 A score is only a number; nothing in `submitScore` says whether it is points or a time. The mode's **ranking**, a setting you own in the creator dashboard, tells Portals how to treat that number. Every mode ranks as **Highest score** until you change it to **Lowest score**, **Shortest time**, or **Longest time**.
@@ -286,7 +330,7 @@ The current host decides how to close the game and restore player controls.
 
 | Method                                                | Result                                                                  |
 | ----------------------------------------------------- | ----------------------------------------------------------------------- |
-| `Portals.ready()`                                     | Resolves to the current player and host context.                        |
+| `Portals.ready()`                                     | Resolves to the current player, host context, and private board.        |
 | `Portals.getPlayer()`                                 | Resolves to the latest player.                                          |
 | `Portals.player.get()`                                | Reads the current public username and playable `/avatar` look.          |
 | `Portals.avatar.openPicker()`                         | Opens trusted global avatar UI and resolves to the refreshed profile.   |
@@ -297,7 +341,7 @@ The current host decides how to close the game and restore player controls.
 | `Portals.saveState(data)`                             | Saves JSON state for the signed-in player.                              |
 | `Portals.loadState()`                                 | Loads JSON state or returns `null`.                                     |
 | `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the best for the mode's ranking unless `{ replace: true }`. A signed-out player needs `{ name }`. |
-| `Portals.getLeaderboard(options?)`                    | Reads up to 100 top casual scores.                                      |
+| `Portals.getLeaderboard(options?)`                    | Reads up to 100 top casual scores. `{ board }` reads a private board.   |
 | `Portals.economy.getCatalog()`                        | Reads products frozen into the current release.                         |
 | `Portals.economy.getInventory()`                      | Reads this player's game-specific entitlements.                         |
 | `Portals.economy.purchase(sku)`                       | Opens Portals-owned Coin confirmation from a player action.             |
