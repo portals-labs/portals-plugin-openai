@@ -33,8 +33,8 @@ TypeScript declarations are not part of the game's files — for a TS project do
 - Portals.identity.requestLogin() → Promise of the signed-in player. Only call from a direct user action (button click). Never ask for passwords in-game.
 - Portals.identity.onChange(listener) → unsubscribe fn; fires on sign-in/out.
 - Portals.saveState(data) / Portals.loadState() — per-player persistence; requires sign-in. State must be JSON-serializable and no larger than 64 KB after JSON encoding. loadState resolves to the saved state or null.
-- Portals.submitScore(score, mode?, options?) — mode defaults to "default"; lowercase letters, numbers, hyphens, max 32 chars. Keeps the player's highest score unless options is { replace: true }, which stores the new score even when lower.
-- Portals.getLeaderboard({ mode, limit }?) → { entries } with rank, playerId, displayName, avatarUrl, score. limit 1–100, default 10. Free games allow unsigned leaderboard reads; paid games require verification first.
+- Portals.submitScore(score, mode?, options?) — mode defaults to "default"; lowercase letters, numbers, hyphens, max 32 chars. Keeps the player's highest score unless options is { replace: true }, which stores the new score even when lower. A signed-out player can post too, but only with { name } (1–24 characters, collected by the game); the submission is rejected without it, and the option is ignored for a signed-in player.
+- Portals.getLeaderboard({ mode, limit }?) → { entries } with rank, playerId, displayName, avatarUrl, score. limit 1–100, default 10. A signed-out player's row carries the name they gave and a null avatarUrl. Free games allow unsigned leaderboard reads and writes; paid games require verification first.
 - Portals.quit() — asks the host to close the game and restore player controls.
 
 All async SDK methods can reject (network, access restrictions) — handle rejections. Casual scores are client-reported: never use scores or peer messages to award currency, paid prizes, access, or any valuable entitlement. Never put API keys, tokens, or other secrets in game code or saved state.

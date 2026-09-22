@@ -164,7 +164,7 @@ await Portals.saveState({
 
 ## Submit and read casual scores
 
-Scores require sign-in. Higher values rank first and, by default, only the best score for each player and mode is kept. Pass `{ replace: true }` as the third argument to store a score even when it is worse than the player's stored one — for a game whose score can legitimately go down.
+Anyone can post a score. A signed-in player is ranked under their Portals profile; a signed-out player is ranked under a name your game collects from them — see [Scores from signed-out players](https://portals.to/documentation/web-games/portals-sdk#scores-from-signed-out-players) below. Higher values rank first and, by default, only the best score for each player and mode is kept. Pass `{ replace: true }` as the third argument to store a score even when it is worse than the player's stored one — for a game whose score can legitimately go down.
 
 A mode can rank the other way round. In **My Games → your game → Settings → Leaderboard ranking**, set a mode to **Lowest score** for golf strokes, move counts, or mistakes: the lowest value ranks first and a new submission replaces the player's stored score only when it is lower. A mode can also rank as a time; see [Time leaderboards](#time-leaderboards) below.
 
@@ -197,11 +197,35 @@ The limit defaults to 10 and may be from 1 to 100. Each row contains:
 | ------------- | ------------------------------------------- |
 | `rank`        | One-based position in the returned board.   |
 | `playerId`    | Stable identifier scoped to this game.      |
-| `displayName` | Current public display name, or `null`.     |
-| `avatarUrl`   | Current public avatar URL, or `null`.       |
+| `displayName` | Current public display name, or the name a signed-out player gave, or `null`. |
+| `avatarUrl`   | Current public avatar URL, or `null`. Always `null` for a signed-out player. |
 | `score`       | Stored score for the selected mode. Elapsed milliseconds on a time mode. |
 
 Game scores are client-reported and intended for social and casual competition. Never use them to award currency, paid prizes, access, or another valuable entitlement.
+
+### Scores from signed-out players
+
+A signed-out player has no Portals profile, so there is no name for the board to rank them under. Your game collects one and passes it as `options.name`:
+
+```js
+const player = await Portals.getPlayer();
+
+if (player.playerId === null) {
+  // Your own UI — a text input, a three-letter arcade entry, whatever fits
+  // the game. Portals does not prompt for this.
+  await Portals.submitScore(1250, "daily", { name: enteredName });
+} else {
+  await Portals.submitScore(1250, "daily");
+}
+```
+
+A name is 1 to 24 characters. The submission is **rejected** for a signed-out player without a usable one, so collect it before you post the score rather than discovering the rejection afterwards. For a signed-in player the option is ignored — their Portals profile name always wins, and a game cannot rename them.
+
+The name is stored on that score alone and is the only thing the board shows for that row: `avatarUrl` is `null` and the row does not link to a Portals profile. The player keeps the same board identity across sessions in the same browser, so beating their own score updates their row instead of adding a second one. Clearing browser storage starts a new one.
+
+A signed-out player's name reaches a public leaderboard exactly as typed. If your game's audience makes that a concern, constrain the input — a fixed character set, a short length, or a pick-from-list — rather than accepting free text.
+
+Paid games are unaffected: a signed-out player cannot purchase access, so they never reach the point of posting a score.
 
 ### Time leaderboards
 
@@ -272,7 +296,7 @@ The current host decides how to close the game and restore player controls.
 | `Portals.matchmaking.onChange(listener)`              | Subscribes to managed-match phase changes; returns an unsubscribe.      |
 | `Portals.saveState(data)`                             | Saves JSON state for the signed-in player.                              |
 | `Portals.loadState()`                                 | Loads JSON state or returns `null`.                                     |
-| `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the best for the mode's ranking unless `{ replace: true }`. |
+| `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the best for the mode's ranking unless `{ replace: true }`. A signed-out player needs `{ name }`. |
 | `Portals.getLeaderboard(options?)`                    | Reads up to 100 top casual scores.                                      |
 | `Portals.economy.getCatalog()`                        | Reads products frozen into the current release.                         |
 | `Portals.economy.getInventory()`                      | Reads this player's game-specific entitlements.                         |
@@ -284,7 +308,7 @@ TypeScript declarations are available at [portals.d.ts](https://portals.to/porta
 
 ## Access and error handling
 
-Free games may read leaderboards while signed out. Saving and score submission require sign-in. Paid games receive SDK capabilities only after Portals verifies purchase access.
+Free games may read leaderboards and post scores while signed out; a signed-out score needs `{ name }`. Saving requires sign-in. Paid games receive SDK capabilities only after Portals verifies purchase access.
 
 Every asynchronous method can reject when the host is unavailable, the request is invalid, access is missing, or a network operation fails. Catch errors at the player action that caused them and keep the game playable when an optional Portals feature is unavailable.
 
