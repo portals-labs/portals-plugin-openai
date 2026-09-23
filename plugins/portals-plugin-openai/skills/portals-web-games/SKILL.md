@@ -112,3 +112,14 @@ Both `push_web_game_source` and `publish_web_game` take an optional `tag`: a one
 - A rejected tag fails the whole call with `INVALID_PAYLOAD` — nothing is pushed or released. Shorten a long or multi-line label, or drop it, and call again.
 - A GitHub sync applied at portals.to/my-games replaces the whole source and clears the draft label, so a publish after one is unlabelled unless it passes its own tag.
 - Nothing else consumes the label: it is developer-facing bookkeeping, never shown to players and never used for discovery or versioning.
+
+## Threaded WASM imports
+
+For an already-built browser export requiring SharedArrayBuffer (including a compatible
+Unreal web export), set `"crossOriginIsolation": true` in root `portals.json`, preserve
+other manifest fields, push the built directory, and test its hosted draft. Read the
+threaded-WASM section in the bundled reference before claiming compatibility. This is
+desktop Chromium Document Isolation Policy support, not general Unreal, Safari/Firefox,
+or mobile support. No SDK API change is needed. Verify actual frame isolation, worker
+shared memory, full game startup and the Portals bridge; never publish just to test it.
+The hosting backend and CDN must both have this support deployed.

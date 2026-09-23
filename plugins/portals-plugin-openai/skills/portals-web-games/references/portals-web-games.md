@@ -26,6 +26,62 @@ Games pushed with push_web_game_source run on Portals with an injected SDK. Load
 
 TypeScript declarations are not part of the game's files — for a TS project download them: curl -o portals.d.ts https://portals.to/portals-sdk/portals.d.ts. The game runs in a sandbox; external network access is restricted — use the SDK below instead of your own backend.
 
+## Threaded WebAssembly and Unreal web exports
+
+A browser export that uses WASM threads needs shared memory. Opt in by adding
+crossOriginIsolation to the existing **root portals.json** alongside any SDK pins:
+
+json
+{
+  "crossOriginIsolation": true
+}
+
+
+Keep this file in the **built output beside index.html**, then push/import that output.
+Preview the new draft before publishing. The setting belongs to the source snapshot:
+changing it affects the draft; a published release changes only after a new publish.
+Set it to false or remove the field to opt out. The value must be a JSON boolean.
+No new MCP setting or SDK method is required.
+
+Portals serves the opted-in entry with
+Document-Isolation-Policy: isolate-and-require-corp. This enables isolation inside
+the existing game iframe while preserving the Portals host and its credential-free
+postMessage SDK bridge. Creators cannot set server headers using HTML meta tags.
+Do not install a service-worker header workaround or disable the iframe sandbox.
+
+**Supported scope: desktop Chromium browsers with Document Isolation Policy**
+(Chrome 137+; verify the actual capabilities in other Chromium browsers).
+This is not a promise of Firefox, Safari, iPhone, Android, or embedded-WebView support.
+Portals adds an early check for crossOriginIsolated and SharedArrayBuffer;
+when unavailable it navigates to a browser-support notice. No user-agent guess
+can replace checking these values in the actual game frame:
+
+js
+const supportsThreads = globalThis.crossOriginIsolated === true &&
+  typeof SharedArrayBuffer !== "undefined";
+
+
+A standalone localhost check is not enough: verify a shared WebAssembly.Memory,
+a real worker, the engine startup, gameplay, and Portals.ready() in the hosted
+preview. The editor's mobile layout preview does not establish mobile browser support.
+
+For Unreal, upload an already-built **browser/WebAssembly export**, not a native
+executable, source project, or .uproject. Record the UE version, export toolchain,
+required browser/WebGPU features, and memory budget. Enabling threads does not add
+WebGPU support to a device or certify an Unreal toolchain. The complete game still
+needs its own qualification.
+
+Keep workers, WASM, JS, and game data in the bundle with relative URLs. Cross-origin
+resources must satisfy both Portals CSP and CORS/CORP; isolation does not expand the
+network allowlist. Prefer uncompressed .js/.wasm files (the CDN handles transport
+compression). Precompressed .br/.gz exports require the correct serving MIME and
+Content-Encoding and are not made compatible by this isolation flag. Current plugin
+upload limits still apply; use the website import path for bundles beyond plugin limits.
+
+For local testing, configure your development server to send the same isolation
+header. Deployment requires both the backend processing changes and the CDN
+viewer-response function; a source upload alone cannot enable an unconfigured CDN.
+
 ## Portals SDK — identity, saves, leaderboards
 
 - await Portals.ready() before touching player data; resolves to the current player and host context.
