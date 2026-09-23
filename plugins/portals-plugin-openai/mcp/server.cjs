@@ -31931,6 +31931,20 @@ async function createShareLink(gameId) {
   );
   return shareUrl.startsWith("/") ? `${API_BASE}${shareUrl}` : shareUrl;
 }
+async function getWebGameSettings(gameId) {
+  const game = await arcadeRequest(
+    `/api/v2/arcade/project-settings?gameId=${encodeURIComponent(gameId)}`,
+    { method: "GET" }
+  );
+  return toWebGameSettingsSummary(game);
+}
+var PRIVATE_LEADERBOARD_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+async function createPrivateLeaderboard(gameId, board) {
+  return arcadeRequest("/api/v2/arcade/leaderboard-boards", {
+    method: "POST",
+    body: { gameId, board }
+  });
+}
 var publishAttempts = /* @__PURE__ */ new Map();
 async function publishWebGame(gameId, expectedRevision, tag) {
   const attemptKey = `${gameId}:${expectedRevision ?? ""}`;
@@ -33354,6 +33368,91 @@ function registerTools(server2) {
             "On PROJECT_ARCHIVED, unarchive the game in My Games first \u2014 an archived game cannot be shared."
           ],
           { game_id: rawGameId }
+        );
+      }
+    }
+  );
+  server2.registerTool(
+    "create_private_leaderboard",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+        idempotentHint: true
+      },
+      description: "Create a private leaderboard on a web game and get its play link. Everyone who opens the game through that link (portals.to/g/<slug>?board=<name>) competes on a ranking of its own \u2014 a tournament, a class, a stream night \u2014 while the public leaderboard carries on untouched. The game code needs no change: every Portals.submitScore and Portals.getLeaderboard call in that session already goes to the private board. Only a board created here or in My Games exists; a link naming any other board silently plays the public leaderboard, so always create the board before sharing its link. The name is the only thing that reaches the board \u2014 anyone holding the link can play it \u2014 so prefer a hard-to-guess name when the board should stay closed.",
+      inputSchema: {
+        gameId: external_exports.string().describe("Web game to add the private leaderboard to (from list_web_games)."),
+        name: external_exports.string().describe(
+          "The private leaderboard's name, which becomes ?board=<name> in its link. Lowercase letters, numbers, and hyphens; must start with a letter or number; at most 64 characters. Example: friday-cup."
+        )
+      }
+    },
+    async ({ gameId: rawGameId, name: rawName }) => {
+      try {
+        const gameId = rawGameId?.trim();
+        if (!gameId) {
+          return errorResult(
+            "create_private_leaderboard",
+            "GAME_ID_REQUIRED",
+            "gameId is required.",
+            "No private leaderboard was created.",
+            ["Call list_web_games to find the gameId."]
+          );
+        }
+        const name = rawName?.trim() ?? "";
+        if (!PRIVATE_LEADERBOARD_NAME_RE.test(name)) {
+          return errorResult(
+            "create_private_leaderboard",
+            "INVALID_NAME",
+            "A private leaderboard name may use lowercase letters, numbers, and hyphens, must start with a letter or number, and may be at most 64 characters.",
+            "No private leaderboard was created.",
+            ["Pick a name like friday-cup or class-7b-spring and retry."],
+            { name: rawName }
+          );
+        }
+        let alreadyExisted = false;
+        try {
+          await createPrivateLeaderboard(gameId, name);
+        } catch (error51) {
+          if (!toErrorMessage(error51).startsWith("BOARD_EXISTS")) throw error51;
+          alreadyExisted = true;
+        }
+        const board = name;
+        const game = await getWebGameSettings(gameId);
+        const boardUrl = `${playUrl(game.slug)}?board=${encodeURIComponent(board)}`;
+        return successResult(
+          "create_private_leaderboard",
+          alreadyExisted ? `Web game ${gameId} already has the private leaderboard ${board}. Its link is ${boardUrl}.` : `Created the private leaderboard ${board} on web game ${gameId}. Its link is ${boardUrl}.`,
+          {
+            game_id: gameId,
+            board,
+            board_url: boardUrl,
+            already_existed: alreadyExisted,
+            game_status: game.status
+          },
+          [
+            `Share ${boardUrl} \u2014 everyone who opens it competes on the ${board} leaderboard instead of the public one.`,
+            ...game.status === "live" ? [] : [
+              "This game is not published yet, so the link cannot be played until publish_web_game has run. The board already exists and starts working the moment the game is live."
+            ],
+            "The game can label the board with (await Portals.ready()).board, which is null on the public leaderboard; no other game change is needed.",
+            "The creator can see, copy, and delete private leaderboards in My Games \u2192 Settings \u2192 Private leaderboards. Deleting one deletes its scores."
+          ]
+        );
+      } catch (error51) {
+        return errorResult(
+          "create_private_leaderboard",
+          "CREATE_PRIVATE_LEADERBOARD_FAILED",
+          toErrorMessage(error51),
+          "Failed to create the private leaderboard.",
+          [
+            "Confirm the MCP is authenticated (call authenticate).",
+            "Verify the gameId belongs to this account (call list_web_games).",
+            "On BOARD_LIMIT_REACHED, the game holds its maximum; the creator must delete one in My Games \u2192 Settings \u2192 Private leaderboards first."
+          ],
+          { game_id: rawGameId, name: rawName }
         );
       }
     }
@@ -35504,7 +35603,7 @@ TypeScript declarations are not part of the game's files \u2014 for a TS project
 - Portals.saveState(data) / Portals.loadState() \u2014 per-player persistence; requires sign-in. State must be JSON-serializable and no larger than 64 KB after JSON encoding. loadState resolves to the saved state or null.
 - Portals.submitScore(score, mode?, options?) \u2014 mode defaults to "default"; lowercase letters, numbers, hyphens, max 32 chars. Keeps the player's highest score unless options is { replace: true }, which stores the new score even when lower. A signed-out player (playerId null) may post only with { name } \u2014 1 to 24 characters, collected by the game \u2014 and is rejected without it; the option is ignored for a signed-in player, whose profile name wins. That name is all the board shows for the row and reaches a public board exactly as typed, so constrain the input.
 - Portals.getLeaderboard({ mode, limit }?) \u2192 { entries } with rank, playerId, displayName, avatarUrl, score. limit 1\u2013100, default 10. A signed-out player's row carries the name they gave and a null avatarUrl. Free games allow unsigned leaderboard reads and writes; paid games require verification first.
-- Private leaderboards: a creator creates one in My Games \u2192 Settings \u2192 Private leaderboards and shares its ?board=<name> play link. Every submitScore/getLeaderboard in that session goes to that board instead of the public one, so a game needs no change. (await Portals.ready()).board names it (null on the public board) if you want to label it; both calls also take an explicit { board } (lowercase letters, numbers, hyphens, max 64). Only a board the creator created exists \u2014 never invent a board name, since any other key silently plays the public board.
+- Private leaderboards: create one with the create_private_leaderboard tool (or the creator does it in My Games \u2192 Settings \u2192 Private leaderboards) and share the ?board=<name> play link it returns. Every submitScore/getLeaderboard in that session goes to that board instead of the public one, so a game needs no change. (await Portals.ready()).board names it (null on the public board) if you want to label it; both calls also take an explicit { board } (lowercase letters, numbers, hyphens, max 64). Only a board the creator created exists \u2014 never invent a board name, since any other key silently plays the public board.
 - Portals.quit() \u2014 asks the host to close the game and restore player controls.
 
 All async SDK methods can reject (network, access restrictions) \u2014 handle rejections. Casual scores are client-reported: never use scores or peer messages to award currency, paid prizes, access, or any valuable entitlement. Never put API keys, tokens, or other secrets in game code or saved state.
