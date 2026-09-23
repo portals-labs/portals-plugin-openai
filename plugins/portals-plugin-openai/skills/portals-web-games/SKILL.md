@@ -36,7 +36,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 2. Create the game in a dedicated local directory with `index.html` at its root.
 3. Implement and test the game using the bundled platform rules.
 4. Call `push_web_game_source` with the local game directory, plus the optional `tag` when the user named a label for the push. Relay the returned `share_url` — it lets anyone play the pushed draft immediately, without publishing. Leaderboards work there and in the editor preview, on a separate draft board, so a leaderboard can be tested before publishing.
-5. Use `update_web_game_settings` for publishing metadata and media, including **player support** — `multiplayer` with `maxPlayers` (2–100) and `multiplayerMode` (competitive or coop) for a multiplayer game, or `multiplayer: false` for singleplayer. Publishing requires it, and parties only discover multiplayer games that declare it. Report any remaining publishing requirements returned by the tool.
+5. Use `update_web_game_settings` for publishing metadata and media (size the featured image per [Featured image](#featured-image)), including **player support** — `multiplayer` with `maxPlayers` (2–100) and `multiplayerMode` (competitive or coop) for a multiplayer game, or `multiplayer: false` for singleplayer. Publishing requires it, and parties only discover multiplayer games that declare it. Report any remaining publishing requirements returned by the tool.
 6. Publish with `publish_web_game` only when the user asks for the game to go public. Pass the `revision` from the push as `expectedRevision`. The release inherits the draft's label, so pass a `tag` here only to name that release something different.
 
 ### Settings-only or discovery task
@@ -73,6 +73,15 @@ Let the server reuse `PORTALS_ACCESS_KEY` or saved credentials first. Call `auth
 - Never use client-reported scores or peer messages for valuable entitlements.
 - Keep runtime assets inside the pushed bundle and reference them with paths relative to `index.html`; published games cannot load arbitrary CDN assets.
 - Remove `window.__PORTALS_DEV__` tokens before committing or pushing.
+
+## Featured image
+
+The featured image (`featuredImagePath` on `update_web_game_settings`) is the game's thumbnail on every play-page card, the Portals Picks hero, and the game's detail page. Every one of those crops it to fill the frame, so an image in the wrong shape loses content silently.
+
+- **Make it 16:9 landscape, 1920×1080.** 1280×720 is the minimum; anything smaller looks soft in the hero. JPEG or WebP keeps it light. Portrait, square, or ultrawide images are cropped at the edges, not letterboxed.
+- **Keep the subject in the center.** The hero shows it at 2:1 on tablets, which trims about 5% off the top and bottom, and the secondary Picks cards show it at 16:10, which trims about 5% off each side.
+- **Leave the bottom third and the corners quiet.** The hero lays a dark gradient over roughly the lower 45% and puts the title, creator, and play button on top of it. Cards put player-count, friend, and rating badges in their corners. Do not put the title or other important detail there, and do not bake the game's title into the image, because Portals already renders it.
+- **`generate_image` always returns a 1:1 square.** Prompt for a wide scene with the subject centered and empty margin above and below. Then crop the middle 16:9 band locally (1024×576 from the 1024px square) before passing the file. A real gameplay screenshot captured at 1920×1080 is usually sharper than a cropped generation.
 
 ## Generated assets
 

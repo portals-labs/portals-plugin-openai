@@ -33503,7 +33503,7 @@ function registerTools(server2) {
           "New canonical game link: the game moves to portals.to/g/<slug>. 3\u201363 lowercase letters, numbers, or hyphens; starts and ends with a letter or number. Old links keep working as aliases. Owner-only."
         ),
         featuredImagePath: external_exports.string().optional().describe(
-          "Local path to the featured image (the game's cover/thumbnail). JPEG, PNG, or WebP, up to 10 MB; it is uploaded and set in one step."
+          "Local path to the featured image (the game's cover/thumbnail). JPEG, PNG, or WebP, up to 10 MB; it is uploaded and set in one step. Make it 16:9 landscape, ideally 1920\xD71080 (at least 1280\xD7720): the play page crops it to fill 16:9 cards and a hero that runs from 2:1 to 16:10, so keep the subject centered, keep the bottom third and corners free of important detail (the title, play button, and badges are drawn over them), and do not bake the game's title into the image. generate_image returns a 1:1 square \u2014 crop it to 16:9 before passing it."
         ),
         removeFeaturedImage: external_exports.boolean().optional().describe("Remove the current featured image (Portals falls back to a generated one)."),
         galleryPaths: external_exports.array(external_exports.string()).optional().describe(
