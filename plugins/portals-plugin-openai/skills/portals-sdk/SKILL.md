@@ -49,3 +49,14 @@ The host control is outside and above untrusted game code. Never try to hide, re
 - Real-time multiplayer, text chat, and voice: the `portals-multiplayer-and-voice` skill.
 - Authoritative server-side game logic: the `portals-server-scripts` skill.
 - Player avatars in a Three.js game: the `portals-guardian-avatars` skill.
+
+## Threaded WASM imports
+
+For an already-built browser export requiring SharedArrayBuffer (including a compatible
+Unreal web export), set `"crossOriginIsolation": true` in root `portals.json`, preserve
+other manifest fields, push the built directory, and test its hosted draft. Read the
+threaded-WASM section in the bundled reference before claiming compatibility. This is
+desktop Chromium Document Isolation Policy support, not general Unreal, Safari/Firefox,
+or mobile support. No SDK API change is needed. Verify actual frame isolation, worker
+shared memory, full game startup and the Portals bridge; never publish just to test it.
+The hosting backend and CDN must both have this support deployed.
