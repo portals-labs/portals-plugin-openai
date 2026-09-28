@@ -2,7 +2,7 @@
 
 Source: [https://portals.to/documentation/web-games/portals-sdk](https://portals.to/documentation/web-games/portals-sdk) — verbatim copy of the official Portals documentation.
 
-The Portals SDK connects a hosted web game to the Portals player and host. It supports identity, saved progress, casual scores, leaderboard reads, game-specific Coin products, and closing the game from either standalone or in-room play. For setup and the complete purchase contract, see [Sell game products for Coins](https://portals.to/documentation/web-games/in-game-coins). For real-time multiplayer, in-game text chat, and voice chat, see [Multiplayer, Chat, and Voice](https://portals.to/documentation/web-games/multiplayer-and-voice). To put the player's Guardian avatar in a Three.js game — wearables, animation and a character controller — see [Guardian Avatars](https://portals.to/documentation/web-games/guardian-avatars).
+The Portals SDK connects a hosted web game to the Portals player and host. It supports identity, saved progress, casual scores, leaderboard reads, analytics events, game-specific Coin products, and closing the game from either standalone or in-room play. For setup and the complete purchase contract, see [Sell game products for Coins](https://portals.to/documentation/web-games/in-game-coins). For real-time multiplayer, in-game text chat, and voice chat, see [Multiplayer, Chat, and Voice](https://portals.to/documentation/web-games/multiplayer-and-voice). To put the player's Guardian avatar in a Three.js game — wearables, animation and a character controller — see [Guardian Avatars](https://portals.to/documentation/web-games/guardian-avatars).
 
 Portals injects the SDK into every processed preview and published bundle. Your project includes it from its own game origin:
 
@@ -372,6 +372,29 @@ for (const entry of board.entries) {
 
 Always submit milliseconds. A value in seconds still ranks in the right order but displays as a fraction of a second on the game page.
 
+## Record analytics events
+
+Every play of your published game is already counted: sessions, active and new players, and play time. The **Analytics** tab that shows them is in preview and is hidden by default. To open it, add `?analytics=1` to your game's page in My Games, for example `https://portals.to/my-games/web/<gameId>?analytics=1&tab=analytics`. The tab stays visible while that parameter is in the URL.
+
+Record your own events to see what players do in the game:
+
+```js
+Portals.track("level_complete", { level: 3, character: "knight", hard: true });
+Portals.track("shop:open");
+```
+
+`track` doesn't return anything or wait for a reply. The host batches events and sends them in the background, and outside a Portals host the call does nothing. It throws when the name or properties are invalid, so a mistake shows up while you're developing:
+
+- **Name:** starts with a letter and uses only letters, numbers, underscores, colons, or hyphens, up to 64 characters. Names starting with `portals:` are reserved.
+- **Properties:** optional, at most 20. Each key starts with a letter and uses only letters, numbers, or underscores, up to 40 characters. Values are strings (up to 256 characters), finite numbers, or booleans.
+- **Names per game:** up to 100 distinct event names. Events with a new name beyond that are not recorded, so use properties for things that vary, such as `{ level: 3 }` rather than `level_3_complete`.
+
+For each event, the Analytics tab shows its daily count, unique players per day and across the selected range, and the most recent individual events with their properties. Choose **break down by** on an event to count its values of one property, for example completions per `level`. A breakdown counts events recorded from the moment you choose it, and keeps up to 50 distinct values per day; further values are counted as `(other)`.
+
+Events from the editor preview and draft links are stored as test events. They appear in the event list when you turn on **show test events**, and never count toward the published game's numbers.
+
+Days are UTC. Individual events are kept for 90 days; daily counts are kept for as long as the game exists. A game records at most 250,000 events per day, and the Analytics tab shows when that limit was reached. Events are reported by the player's browser, like casual scores: use them to understand your game, never to award currency, prizes, or access. Games published before SDK 1.14 need to be published again to use `Portals.track`.
+
 ## Close the game
 
 ```js
@@ -398,6 +421,7 @@ The current host decides how to close the game and restore player controls.
 | `Portals.loadState()`                                 | Loads JSON state or returns `null`.                                     |
 | `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the best for the mode's ranking unless `{ replace: true }`. A signed-out player needs `{ name }`. |
 | `Portals.getLeaderboard(options?)`                    | Reads up to 100 top casual scores. `{ board }` reads a private board.   |
+| `Portals.track(name, props?)`                         | Records an analytics event for the game's Analytics tab.                |
 | `Portals.economy.getCatalog()`                        | Reads products frozen into the current release.                         |
 | `Portals.economy.getInventory()`                      | Reads this player's game-specific entitlements.                         |
 | `Portals.economy.purchase(sku)`                       | Opens Portals-owned Coin confirmation from a player action.             |
