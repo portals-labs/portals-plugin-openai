@@ -123,3 +123,15 @@ desktop Chromium Document Isolation Policy support, not general Unreal, Safari/F
 or mobile support. No SDK API change is needed. Verify actual frame isolation, worker
 shared memory, full game startup and the Portals bridge; never publish just to test it.
 The hosting backend and CDN must both have this support deployed.
+
+## Draft game changelogs
+
+After a verified game update, use `list_web_game_changelog` to inspect existing entries and
+`save_web_game_changelog_draft` to prepare concise player-facing notes. Include only changes
+actually implemented and checked; omit internal infrastructure and security details. Use a
+creator-provided version or a descriptive release name, never an invented version number.
+Choose one stable `entryId` for a new draft with `expectedRevision: 0`, retain both for retries,
+and use the returned revision for later edits. On `CHANGELOG_CHANGED`, read and reconcile.
+The tool saves a private draft only; it cannot edit published entries. Give the creator the
+returned review URL. They review and publish the entry in My Games → Changelog separately
+from publishing the game. Never claim that saving a draft or releasing a game publishes notes.
