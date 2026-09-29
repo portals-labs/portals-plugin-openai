@@ -1,6 +1,6 @@
 # Guardian Avatars
 
-Source: [https://portals.to/documentation/web-games/guardian-avatars](https://portals.to/documentation/web-games/guardian-avatars) — the official Portals documentation, extended with the SDK reference for every released capability through 0.37.0. Version markers like (0.36.0) name the release a feature first shipped in; a game pinned below that version does not have it. Types: [portals.to/portals-sdk/guardians.d.ts](https://portals.to/portals-sdk/guardians.d.ts) — the source of truth for the API. Read it before writing code against a method not shown here.
+Source: [https://portals.to/documentation/web-games/guardian-avatars](https://portals.to/documentation/web-games/guardian-avatars) — the official Portals documentation, extended with SDK reference material. Version markers like (0.36.0) name the release a feature first shipped in; a game pinned below that version does not have it. The [changelog](https://portals.to/documentation/web-games/guardian-avatars-changelog) lists every release. Types: [portals.to/portals-sdk/guardians.d.ts](https://portals.to/portals-sdk/guardians.d.ts) — the source of truth for the API. Read it before writing code against a method not shown here.
 
 The Guardian avatar SDK renders the same avatars players wear across Portals — body types, skin/hair/eye colour, hair styles, the wearables system, retargeted locomotion clips, facial animation, and a first/third-person character controller with the Portals feel.
 
@@ -49,7 +49,7 @@ Portals writes the import map that resolves `@portals/avatars`, `three` and `thr
 
 Note the two files: `guardians-sdk.js` is the classic-script loader, `guardians-sdk.module.js` is the SDK. Mapping the bare specifier at the loader hands the game the wrong file. Both routes load the same module, so mixing them in one project is fine.
 
-Only these Three.js addons are hosted: `controls/OrbitControls.js`, `loaders/GLTFLoader.js`, `utils/BufferGeometryUtils.js`. Importing any other `three/addons/*` path fails at runtime.
+Only these Three.js addons are hosted: `controls/OrbitControls.js`, `controls/TransformControls.js`, `loaders/GLTFLoader.js`, `utils/BufferGeometryUtils.js`, `utils/SkeletonUtils.js`, and the bloom set — `postprocessing/EffectComposer.js`, `MaskPass.js`, `Pass.js`, `RenderPass.js`, `ShaderPass.js`, `UnrealBloomPass.js`, `shaders/CopyShader.js`, `shaders/LuminosityHighPassShader.js`. Importing any other `three/addons/*` path fails at runtime.
 
 ## Versions
 
@@ -61,10 +61,12 @@ The avatar SDK is released in versions. Which version a game runs depends on how
 To control the version on every path, pin it in a `portals.json` at the project root:
 
 ```json
-{ "guardiansSdk": "0.36.0" }
+{ "guardiansSdk": "<version>" }
 ```
 
 The pin wins everywhere — editor, AI builder, plugin pushes, zip imports and GitHub builds — so the version you developed against is the version that publishes. Pinning a version that was never released fails the publish with an error naming the current release. Always pin a Guardian game you push.
+
+The current release, and the Three.js version it is built against, are published at `https://portals.to/portals-sdk/guardians/current.json` as `{ "version": "…", "three": "…" }`. Read it instead of guessing a number.
 
 ### Local development
 
@@ -196,11 +198,11 @@ Take `THREE` from the SDK rather than loading it yourself. From the classic scri
 import * as THREE from 'three';
 ```
 
-Loading a second copy from a CDN will not work — the game CSP keeps `script-src` at `'self'` — and would break instance checks even if it did.
+Loading a second copy from a CDN will not work — the game CSP admits no external script hosts — and would break instance checks even if it did.
 
 ## Assets load through Portals
 
-Guardian models, wearables and animation clips live on the Portals CDN. Published games run under `connect-src 'self'` and cannot fetch from another host, so the SDK rewrites asset URLs onto managed same-origin paths that Portals serves for you (`/_portals/cdn/…`, `/_portals/media/…` and, for wearables stored elsewhere, `/_portals/item/<id>`). This is automatic — pass ordinary Portals URLs and they resolve. Hand-written `fetch()` to a CDN works in no environment.
+Guardian models, wearables and animation clips live on Portals storage. Published games run under `connect-src 'self'` and cannot fetch from arbitrary hosts, so the SDK rewrites Portals CDN URLs onto managed same-origin paths that Portals serves for you (`/_portals/cdn/…`, `/_portals/media/…`) and loads wearables in the Portals storage bucket directly, which the game's content policy allows (0.47.1). This is automatic — pass ordinary Portals URLs and they resolve, byte-for-byte the asset the player owns. Hand-written `fetch()` to a CDN works in no environment.
 
 Two consequences worth knowing:
 
@@ -210,7 +212,7 @@ Two consequences worth knowing:
   import { resolveAssetUrl } from '@portals/avatars';
   img.src = resolveAssetUrl(def.thumbnail);
   ```
-- **Arbitrary hosts need an item id.** A wearable whose GLB is hosted outside Portals can only be fetched through the item proxy, which addresses it by inventory item id. Equip it as a catalog item (with its real inventory `id`) rather than as a bare URL. A raw URL to an unmanaged host logs a warning and is returned unchanged, so the browser blocks it — that is the failure mode to look for when a wearable silently does not appear.
+- **Arbitrary hosts need an item id.** A wearable whose GLB is hosted outside Portals can only be fetched through the item proxy (`/_portals/item/<id>`), which addresses it by inventory item id and serves the item's current catalog model. Equip it as a catalog item (with its real inventory `id`) rather than as a bare URL. A raw URL to an unmanaged host logs a warning and is returned unchanged, so the browser blocks it — that is the failure mode to look for when a wearable silently does not appear.
 
 Relative, `blob:` and `data:` URLs pass through untouched — assets shipped inside your own bundle need nothing.
 
@@ -240,6 +242,19 @@ avatar.wearables.getEquipped();
 Equipping replaces whatever occupies the item's slots, hides the body meshes the slot covers, and re-binds skinned wearables to the avatar skeleton. Multi-slot items (dresses, full-body suits) declare every slot they occupy via `slots`. `urlFemale` is used automatically on a female Guardian.
 
 Right-hand items get a carry pose and a use action inferred from the item name — an axe swings, a pistol shoots — or set `handItemType` explicitly. Listen for the action with `controller.onItemUse`.
+
+### Animated wearables (0.47.0)
+
+Some back wearables — fish-tank backpacks, shoulder pets, rocket packs — carry an animation inside their GLB. A back-category item marked animated plays the **first** clip embedded in its GLB, on loop, for as long as it is worn:
+
+- **Items from a player's inventory need nothing.** Portals marks them, and `createAvatarFromPlayer` equips them animated.
+- **A wearable your game ships itself** sets `animated: true` on its definition, and can pass `animations` alongside `object` when you load the GLB yourself. A GLB saved with `save_avatar_wearable` whose listing says `animated: true` is equipped the same way:
+
+  ```js
+  await avatar.wearables.equip({ id: 'jetpack', name: 'Jetpack', slot: 'back', url: './jetpack.glb', animated: true });
+  ```
+
+The animation runs from `avatars.update(dt)` and stops when the item comes off. It only moves nodes inside the wearable, so rig the moving part to its own small skeleton and attach it rigidly under a Guardian bone; it cannot pose the avatar. Games pinned below 0.47.0 show these items static.
 
 ## Animation
 

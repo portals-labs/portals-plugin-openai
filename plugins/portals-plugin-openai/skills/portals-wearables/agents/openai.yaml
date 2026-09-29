@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Shop Wearables"
+  short_description: "Make, check and submit wearables for the Portals Shop"
+  default_prompt: "Use $portals-wearables to make a wearable for the Portals Shop and submit it for review."

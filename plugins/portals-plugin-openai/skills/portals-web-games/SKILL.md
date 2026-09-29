@@ -1,6 +1,6 @@
 ---
 name: portals-web-games
-description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards and host UI safe areas, Portals.economy Coin microtransactions and product catalogs, Portals.net multiplayer, Portals.voice, Guardian avatars, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
+description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards and host UI safe areas, Portals.economy Coin microtransactions and product catalogs, Portals.net multiplayer, Portals.voice, Guardian avatars, Shop wearable drafts, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
 ---
 
 # Portals Web Games
@@ -19,6 +19,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 - `portals-server-sim` — running the game simulation itself on the server: shared physics, snapshots, client prediction, and fallback to host authority.
 - `portals-guardian-avatars` — Guardian avatars, wearables, animation, and the character controller in Three.js.
 - `portals-game-economy` — selling in-game products for Coins: the product catalog, `Portals.economy` purchases, and the purchase sandbox.
+- `portals-wearables` — making Guardian wearables for the Portals Shop: the wearable standard, the rig, budgets, and checking, drafting and submitting them with `validate_wearable`, `create_wearable_draft`, `update_wearable_draft` and `submit_wearable_draft`.
 
 ## Choose the workflow
 
@@ -123,3 +124,15 @@ desktop Chromium Document Isolation Policy support, not general Unreal, Safari/F
 or mobile support. No SDK API change is needed. Verify actual frame isolation, worker
 shared memory, full game startup and the Portals bridge; never publish just to test it.
 The hosting backend and CDN must both have this support deployed.
+
+## Draft game changelogs
+
+After a verified game update, use `list_web_game_changelog` to inspect existing entries and
+`save_web_game_changelog_draft` to prepare concise player-facing notes. Include only changes
+actually implemented and checked; omit internal infrastructure and security details. Use a
+creator-provided version or a descriptive release name, never an invented version number.
+Choose one stable `entryId` for a new draft with `expectedRevision: 0`, retain both for retries,
+and use the returned revision for later edits. On `CHANGELOG_CHANGED`, read and reconcile.
+The tool saves a private draft only; it cannot edit published entries. Give the creator the
+returned review URL. They review and publish the entry in My Games → Changelog separately
+from publishing the game. Never claim that saving a draft or releasing a game publishes notes.
