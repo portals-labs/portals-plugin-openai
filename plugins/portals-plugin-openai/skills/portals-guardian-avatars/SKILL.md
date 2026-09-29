@@ -60,3 +60,4 @@ A game that renders the signed-in player's Guardian inherits whatever that accou
 
 - Identity, saves, and leaderboards: the `portals-sdk` skill.
 - Multiplayer and voice: the `portals-multiplayer-and-voice` skill.
+- Making a wearable and submitting it to the Portals Shop: the `portals-wearables` skill.

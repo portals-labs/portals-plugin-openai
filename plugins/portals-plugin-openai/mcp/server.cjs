@@ -31654,9 +31654,9 @@ async function saveWebGameChangelogDraft(input) {
 }
 
 // src/tools.ts
-var import_node_crypto2 = require("node:crypto");
-var import_promises3 = require("node:fs/promises");
-var import_node_path4 = require("node:path");
+var import_node_crypto3 = require("node:crypto");
+var import_promises4 = require("node:fs/promises");
+var import_node_path5 = require("node:path");
 
 // src/auth.ts
 var import_node_http = require("node:http");
@@ -32802,6 +32802,157 @@ function findAvatarItem(wardrobe, itemId) {
   return { item: null, ambiguous: [] };
 }
 
+// src/wearable-client.ts
+var import_node_crypto2 = require("node:crypto");
+var import_promises3 = require("node:fs/promises");
+var import_node_path4 = require("node:path");
+var WEARABLE_UPLOAD_LIMITS = {
+  glb: 50 * 1024 * 1024,
+  image: 5 * 1024 * 1024
+};
+var CONTENT_TYPES = {
+  ".glb": { kind: "glb", contentType: "model/gltf-binary" },
+  ".png": { kind: "image", contentType: "image/png" },
+  ".jpg": { kind: "image", contentType: "image/jpeg" },
+  ".jpeg": { kind: "image", contentType: "image/jpeg" },
+  ".webp": { kind: "image", contentType: "image/webp" }
+};
+var WearableApiError = class extends Error {
+  constructor(path, status, code, payload) {
+    const message = typeof payload.message === "string" ? payload.message : "";
+    super(message ? `${code}: ${message}` : `${path} failed (${code}).`);
+    this.path = path;
+    this.status = status;
+    this.code = code;
+    this.payload = payload;
+    this.name = "WearableApiError";
+  }
+  path;
+  status;
+  code;
+  payload;
+};
+var WearableFileError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "WearableFileError";
+  }
+  code;
+};
+function absoluteUrl(url2) {
+  if (typeof url2 !== "string" || !url2) return "";
+  return url2.startsWith("/") ? `${API_BASE}${url2}` : url2;
+}
+async function wearableRequest(path, init) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: init.method,
+    headers: {
+      "x-access-key": getAccessKey(),
+      "Content-Type": "application/json",
+      // A retried write replays the first answer instead of drafting twice.
+      ...init.idempotent ? { "Idempotency-Key": (0, import_node_crypto2.randomUUID)() } : {}
+    },
+    body: JSON.stringify(init.body)
+  });
+  const raw = await res.text();
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    throw new Error(`${path} returned a non-JSON response (HTTP ${res.status}): ${raw.slice(0, 200)}`);
+  }
+  if (!res.ok || payload?.code !== "SUCCESS") {
+    const body = payload && typeof payload === "object" ? payload : {};
+    throw new WearableApiError(path, res.status, body.code ?? `HTTP_${res.status}`, body);
+  }
+  return payload.data;
+}
+async function createWearableUploadUrl(kind, fileType, fileSize) {
+  return wearableRequest("/api/v2/arcade/wearables/upload-url", {
+    method: "POST",
+    body: { kind, fileType, fileSize }
+  });
+}
+async function uploadWearableBytes(grant, bytes, fileName) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(grant.uploadFields)) form.append(key, value);
+  form.append("file", new Blob([new Uint8Array(bytes)], { type: grant.contentType }), fileName);
+  const res = await fetch(grant.uploadUrl, { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Upload to Portals storage failed (HTTP ${res.status}). ${body.slice(0, 300)}`.trim());
+  }
+}
+async function uploadLocalWearableFile(localPath, kind) {
+  const absolutePath = (0, import_node_path4.resolve)(localPath);
+  const type = CONTENT_TYPES[(0, import_node_path4.extname)(absolutePath).toLowerCase()];
+  if (!type || type.kind !== kind) {
+    throw new WearableFileError(
+      "UNSUPPORTED_FILE",
+      kind === "glb" ? `${localPath} is not a .glb file. Export the wearable as a single binary glTF (.glb).` : `${localPath} is not a PNG, JPEG or WebP image.`
+    );
+  }
+  let size;
+  try {
+    const info = await (0, import_promises3.stat)(absolutePath);
+    if (!info.isFile()) throw new Error("not a file");
+    size = info.size;
+  } catch {
+    throw new WearableFileError("FILE_NOT_FOUND", `No file at ${absolutePath}.`);
+  }
+  if (size < 1) throw new WearableFileError("EMPTY_FILE", `${absolutePath} is empty.`);
+  const max = WEARABLE_UPLOAD_LIMITS[kind];
+  if (size > max) {
+    throw new WearableFileError(
+      "FILE_TOO_LARGE",
+      `${absolutePath} is ${(size / 1024 / 1024).toFixed(1)} MB; the limit is ${max / 1024 / 1024} MB.`
+    );
+  }
+  const grant = await createWearableUploadUrl(kind, type.contentType, size);
+  await uploadWearableBytes(grant, await (0, import_promises3.readFile)(absolutePath), (0, import_node_path4.basename)(absolutePath));
+  return { localPath: absolutePath, assetUrl: grant.assetUrl, bytes: size, contentType: grant.contentType };
+}
+async function resolveWearableFile(value, kind) {
+  const trimmed = value.trim();
+  if (/^https:\/\//i.test(trimmed)) return { assetUrl: trimmed, uploaded: null };
+  const uploaded = await uploadLocalWearableFile(trimmed, kind);
+  return { assetUrl: uploaded.assetUrl, uploaded };
+}
+async function validateWearable(glbUrl, type, category) {
+  return wearableRequest("/api/v2/arcade/wearables/validate", {
+    method: "POST",
+    body: { glbUrl, type, ...category ? { category } : {} }
+  });
+}
+function toDraft(data) {
+  return { itemId: String(data?.itemId ?? ""), status: String(data?.status ?? ""), editUrl: absoluteUrl(data?.editUrl) };
+}
+async function createWearableDraft(fields) {
+  return toDraft(await wearableRequest("/api/v2/arcade/wearables/drafts", { method: "POST", body: { fields }, idempotent: true }));
+}
+async function updateWearableDraft(itemId, fields) {
+  return toDraft(await wearableRequest("/api/v2/arcade/wearables/drafts", { method: "PATCH", body: { itemId, fields }, idempotent: true }));
+}
+async function submitWearableDraft(itemId) {
+  const data = await wearableRequest("/api/v2/arcade/wearables/submit", {
+    method: "POST",
+    body: { itemId },
+    idempotent: true
+  });
+  return { itemId: data.itemId, status: data.status };
+}
+function describeWearableRefusal(error51) {
+  const payload = { ...error51.payload };
+  for (const key of ["grantUrl", "editUrl"]) {
+    if (typeof payload[key] === "string") payload[key] = absoluteUrl(payload[key]);
+  }
+  if (Array.isArray(payload.blockers)) {
+    payload.blockers = payload.blockers.map((blocker) => blocker && typeof blocker === "object" && typeof blocker.url === "string" ? { ...blocker, url: absoluteUrl(blocker.url) } : blocker);
+  }
+  return payload;
+}
+
 // src/tools.ts
 function toErrorMessage(error51) {
   if (error51 instanceof Error) {
@@ -33115,8 +33266,8 @@ function registerTools(server2) {
             ["Call list_web_games to find an existing gameId, or pass a title to create a project."]
           );
         }
-        const root = (0, import_node_path4.resolve)(directory.trim());
-        const rootInfo = await (0, import_promises3.stat)(root).catch(() => null);
+        const root = (0, import_node_path5.resolve)(directory.trim());
+        const rootInfo = await (0, import_promises4.stat)(root).catch(() => null);
         if (!rootInfo?.isDirectory()) {
           return errorResult(
             "push_web_game_source",
@@ -33277,8 +33428,8 @@ function registerTools(server2) {
             ["Pass the directory to write the project into."]
           );
         }
-        const root = (0, import_node_path4.resolve)(directory.trim());
-        const existing = await (0, import_promises3.stat)(root).catch(() => null);
+        const root = (0, import_node_path5.resolve)(directory.trim());
+        const existing = await (0, import_promises4.stat)(root).catch(() => null);
         if (existing && !existing.isDirectory()) {
           return errorResult(
             "pull_web_game_source",
@@ -33289,7 +33440,7 @@ function registerTools(server2) {
           );
         }
         if (existing && overwrite !== true) {
-          const entries = await (0, import_promises3.readdir)(root);
+          const entries = await (0, import_promises4.readdir)(root);
           if (entries.length > 0) {
             return errorResult(
               "pull_web_game_source",
@@ -33316,8 +33467,8 @@ function registerTools(server2) {
             while (next < targets.length) {
               const target = targets[next++];
               const contents = await fetchProjectFile(target.url, target.path);
-              await (0, import_promises3.mkdir)((0, import_node_path4.join)(target.absolutePath, ".."), { recursive: true });
-              await (0, import_promises3.writeFile)(target.absolutePath, contents);
+              await (0, import_promises4.mkdir)((0, import_node_path5.join)(target.absolutePath, ".."), { recursive: true });
+              await (0, import_promises4.writeFile)(target.absolutePath, contents);
             }
           })
         );
@@ -33504,8 +33655,8 @@ function registerTools(server2) {
     ".webm": { contentType: "video/webm", mediaType: "video" }
   };
   async function stageListingMedia(gameId, filePath, purpose) {
-    const resolved = (0, import_node_path4.resolve)(filePath.trim());
-    const media = MEDIA_CONTENT_TYPES[(0, import_node_path4.extname)(resolved).toLowerCase()];
+    const resolved = (0, import_node_path5.resolve)(filePath.trim());
+    const media = MEDIA_CONTENT_TYPES[(0, import_node_path5.extname)(resolved).toLowerCase()];
     if (!media) {
       throw new Error(
         `${resolved}: unsupported media type \u2014 use .jpg/.jpeg/.png/.webp${purpose === "gallery" ? "/.mp4/.webm" : ""}.`
@@ -33514,11 +33665,11 @@ function registerTools(server2) {
     if (purpose === "thumbnail" && media.mediaType !== "image") {
       throw new Error(`${resolved}: the featured image must be a JPEG, PNG, or WebP image.`);
     }
-    const info = await (0, import_promises3.stat)(resolved).catch(() => null);
+    const info = await (0, import_promises4.stat)(resolved).catch(() => null);
     if (!info?.isFile()) {
       throw new Error(`${resolved} is not an existing file.`);
     }
-    const bytes = await (0, import_promises3.readFile)(resolved);
+    const bytes = await (0, import_promises4.readFile)(resolved);
     const grant = await createMediaUploadUrl(gameId, media.contentType, bytes.length, purpose);
     await uploadMediaFile(grant, bytes);
     return grant;
@@ -33862,8 +34013,8 @@ function registerTools(server2) {
         let sdkPresent = null;
         let resolvedDirectory = null;
         if (directory?.trim()) {
-          resolvedDirectory = (0, import_node_path4.resolve)(directory.trim());
-          const info = await (0, import_promises3.stat)((0, import_node_path4.join)(resolvedDirectory, "_portals", "sdk.js")).catch(() => null);
+          resolvedDirectory = (0, import_node_path5.resolve)(directory.trim());
+          const info = await (0, import_promises4.stat)((0, import_node_path5.join)(resolvedDirectory, "_portals", "sdk.js")).catch(() => null);
           sdkPresent = info?.isFile() === true;
         }
         const sdkDownloadCommand = `mkdir -p _portals && curl -o _portals/sdk.js ${sdkUrl()}`;
@@ -34366,8 +34517,8 @@ ${htmlSnippet}`,
         const reference = image.trim();
         let imageUrl = reference;
         if (!/^https?:\/\//i.test(reference) && !reference.startsWith("data:")) {
-          const resolved = (0, import_node_path4.resolve)(reference);
-          const contentType = REFERENCE_IMAGE_TYPES[(0, import_node_path4.extname)(resolved).toLowerCase()];
+          const resolved = (0, import_node_path5.resolve)(reference);
+          const contentType = REFERENCE_IMAGE_TYPES[(0, import_node_path5.extname)(resolved).toLowerCase()];
           if (!contentType) {
             return errorResult(
               "image_to_3d_model",
@@ -34377,7 +34528,7 @@ ${htmlSnippet}`,
               ["Convert the reference to a JPEG, PNG, or WebP."]
             );
           }
-          const info = await (0, import_promises3.stat)(resolved).catch(() => null);
+          const info = await (0, import_promises4.stat)(resolved).catch(() => null);
           if (!info?.isFile()) {
             return errorResult(
               "image_to_3d_model",
@@ -34396,7 +34547,7 @@ ${htmlSnippet}`,
               ["Downscale the reference image \u2014 a 1024px view is plenty."]
             );
           }
-          const bytes = await (0, import_promises3.readFile)(resolved);
+          const bytes = await (0, import_promises4.readFile)(resolved);
           imageUrl = `data:${contentType};base64,${bytes.toString("base64")}`;
         }
         const taskId = await startImageToModel({
@@ -35266,6 +35417,254 @@ ${htmlSnippet}`,
       }
     }
   );
+  const wearableType = external_exports.enum(["cosmetic", "avatar"]).describe(
+    "cosmetic \u2014 worn on the Guardian (hat, glasses, top, back item\u2026); avatar \u2014 a full avatar that replaces the Guardian. It picks the standard's budgets."
+  );
+  const wearableFile = (what) => external_exports.string().describe(
+    `${what}: a local path, uploaded to Portals for you, or the https URL an earlier upload returned (validate_wearable's glb_url) to reuse that upload.`
+  );
+  const draftFieldsSchema = {
+    description: external_exports.string().optional().describe("Shop description, up to 500 characters."),
+    category: external_exports.string().optional().describe("Wearable category, for example hat, glasses, top, back. It also guides old-rig migration."),
+    blockedSlots: external_exports.array(external_exports.string()).optional().describe("Other avatar slots this item occupies, so wearing it takes them off (for example a full-body suit blocks top and bottom)."),
+    removesHair: external_exports.boolean().optional().describe("For a hat that covers the whole head: hide the wearer's hair while it is worn."),
+    genderSupport: external_exports.enum(["unisex", "male_only", "female_only"]).optional().describe("Which Guardian bodies the item fits. unisex needs a model and render for both bodies."),
+    glb: wearableFile("The model for the male body (.glb)").optional(),
+    femaleGlb: wearableFile("The model for the female body (.glb)").optional(),
+    render: wearableFile("The Shop render image for the male body (.png, .jpg or .webp, up to 5 MB)").optional(),
+    femaleRender: wearableFile("The Shop render image for the female body").optional()
+  };
+  async function toDraftFields(input) {
+    const fields = {};
+    const uploads = [];
+    const file2 = async (value, kind) => {
+      if (value === void 0) return void 0;
+      const resolved = await resolveWearableFile(value, kind);
+      if (resolved.uploaded) uploads.push(resolved.uploaded);
+      return resolved.assetUrl;
+    };
+    if (input.name !== void 0) fields.name = input.name;
+    if (input.type !== void 0) fields.type = input.type;
+    if (input.description !== void 0) fields.description = input.description;
+    if (input.category !== void 0) fields.category = input.category;
+    if (input.blockedSlots !== void 0) fields.blockedSlots = input.blockedSlots;
+    if (input.removesHair !== void 0) fields.removesHair = input.removesHair;
+    if (input.genderSupport !== void 0) fields.genderSupport = input.genderSupport;
+    const glb = await file2(input.glb, "glb");
+    if (glb) fields.glb = glb;
+    const femaleGlb = await file2(input.femaleGlb, "glb");
+    if (femaleGlb) fields.femaleGlb = femaleGlb;
+    const renderUrl = await file2(input.render, "image");
+    if (renderUrl) fields.renderUrl = renderUrl;
+    const femaleRenderUrl = await file2(input.femaleRender, "image");
+    if (femaleRenderUrl) fields.femaleRenderUrl = femaleRenderUrl;
+    return {
+      fields,
+      uploads: uploads.map((upload) => ({ local_path: upload.localPath, url: upload.assetUrl, bytes: upload.bytes }))
+    };
+  }
+  function wearableError(action, error51, summary, fallbackCode, details = {}) {
+    if (error51 instanceof WearableApiError) {
+      return errorResult(
+        action,
+        error51.code,
+        error51.message,
+        summary,
+        wearableRefusalNextSteps(error51),
+        { ...details, server: describeWearableRefusal(error51) }
+      );
+    }
+    if (error51 instanceof WearableFileError) {
+      return errorResult(action, error51.code, error51.message, summary, [
+        "Nothing was uploaded. Pass a path to an existing .glb model, or a .png, .jpg or .webp render."
+      ], details);
+    }
+    return errorResult(action, fallbackCode, toErrorMessage(error51), summary, [
+      "Confirm the MCP is authenticated (call authenticate)."
+    ], details);
+  }
+  const describeDraft = (draft, uploads) => ({
+    item_id: draft.itemId,
+    status: draft.status,
+    edit_url: draft.editUrl,
+    uploaded: uploads
+  });
+  const draftNextSteps = (draft) => [
+    `The creator finishes the sale on Portals: open ${draft.editUrl} to set the price, supply and any sale dates. Opening it also lets the viewer capture the Shop thumbnail; save the draft there to keep it.`,
+    `Then call submit_wearable_draft with itemId ${draft.itemId} to send it for review. It lists anything still missing.`
+  ];
+  server2.registerTool(
+    "validate_wearable",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false
+      },
+      description: `Check a local wearable GLB against the Portals wearable standard exactly as a Shop upload would, without drafting anything. The file is uploaded to the creator's own Portals upload storage (the check reads it there), then the server runs a dry run of upload ingest: canonical orientation, the Portals rig, the standard's file rules and the budgets for the item type, and the Khronos glTF Validator. Nothing is stored beyond the upload and nothing on Portals changes. Returns ok, the tier and features, stats next to each budget, what ingest would strip, and every issue at once, plus glb_url: pass it as glb to create_wearable_draft or update_wearable_draft to use this exact upload. Needs the access key's "Shop wearable drafts" permission (portals.to/mcp).`,
+      inputSchema: {
+        glbPath: external_exports.string().describe("Path to the local .glb to check."),
+        type: wearableType,
+        category: external_exports.string().optional().describe("The wearable's category (hat, back, \u2026). It guides old-rig migration exactly as a draft save does.")
+      }
+    },
+    async ({ glbPath, type, category }) => {
+      try {
+        const upload = await uploadLocalWearableFile(glbPath, "glb");
+        const report = await validateWearable(upload.assetUrl, type, category);
+        const data = {
+          ok: report.ok,
+          glb_url: report.glbUrl,
+          local_path: upload.localPath,
+          bytes: upload.bytes,
+          type: report.kind,
+          tier: report.tier,
+          features: report.features,
+          budgets: wearableBudgets(report),
+          stats: report.stats,
+          limits: report.limits,
+          removals: report.removals,
+          ...report.addedBones?.length ? { added_bones: report.addedBones } : {},
+          issues: report.issues
+        };
+        if (!report.ok) {
+          return errorResult(
+            "validate_wearable",
+            report.code ?? "INVALID_WEARABLE",
+            report.message ?? "The file does not meet the Portals wearable standard.",
+            `The GLB fails ${report.issues.length} check${report.issues.length === 1 ? "" : "s"}.`,
+            [
+              "Fix every issue in the file and validate again. Messages are the server's own.",
+              ...report.missing?.length ? [`The rig is missing ${report.missing.length} Portals bones: bind the mesh to the rig template (https://portals.to/rigs/new-rig.glb) instead of a custom skeleton.`] : [],
+              "The standard: https://portals.to/documentation/web-games/wearable-standard. The rig: https://portals.to/wearable-standards."
+            ],
+            { ...data, reason: report.reason, ...report.missing ? { missing: report.missing } : {} }
+          );
+        }
+        return successResult(
+          "validate_wearable",
+          `The GLB meets the wearable standard as a ${report.kind} (${report.tier} tier).`,
+          data,
+          [
+            ...report.removals.length > 0 ? ["Ingest will strip what removals lists when the draft is saved; the saved file is the cleaned copy."] : [],
+            `Draft it with create_wearable_draft, passing glb: "${report.glbUrl}" to reuse this upload.`
+          ]
+        );
+      } catch (error51) {
+        return wearableError("validate_wearable", error51, "The wearable was not checked.", "VALIDATE_WEARABLE_FAILED", {
+          glb_path: glbPath
+        });
+      }
+    }
+  );
+  server2.registerTool(
+    "create_wearable_draft",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false
+      },
+      description: `Create a Shop wearable draft on the creator's own account from local files. Local model and render paths are uploaded first; the server then runs the same validation and upload ingest as a save in the Portals Shop form, and a file that fails the wearable standard comes back with the server's issues. The draft is private until it is submitted and approved. Only presentation is set here: price, supply, sale dates, game gating and purchase limits are set on Portals in the draft's Shop form (edit_url), which also captures the Shop thumbnail. Needs the access key's "Shop wearable drafts" permission (portals.to/mcp).`,
+      inputSchema: {
+        name: external_exports.string().describe("Item name shown in the Shop, up to 80 characters."),
+        type: wearableType,
+        ...draftFieldsSchema
+      }
+    },
+    async (input) => {
+      try {
+        const { fields, uploads } = await toDraftFields(input);
+        const draft = await createWearableDraft(fields);
+        return successResult(
+          "create_wearable_draft",
+          `Drafted "${input.name}" (${draft.itemId}).`,
+          describeDraft(draft, uploads),
+          draftNextSteps(draft)
+        );
+      } catch (error51) {
+        return wearableError("create_wearable_draft", error51, "No draft was created.", "CREATE_WEARABLE_DRAFT_FAILED", {
+          name: input.name
+        });
+      }
+    }
+  );
+  server2.registerTool(
+    "update_wearable_draft",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        // Replacing a model clears the Shop thumbnail captured for the old one.
+        destructiveHint: true
+      },
+      description: `Change one of the creator's own wearable drafts, or a rejected item, which saving returns to draft. Pass only the fields to change; local model and render paths are uploaded first and go through the same validation and upload ingest as the Portals Shop form. Replacing a model clears the Shop thumbnail captured for the old one, so the draft's Shop form captures a new one when it is next opened. Sale settings are not set here. Needs the access key's "Shop wearable drafts" permission (portals.to/mcp).`,
+      inputSchema: {
+        itemId: external_exports.string().describe("The draft's item id, from create_wearable_draft."),
+        name: external_exports.string().optional().describe("Item name shown in the Shop, up to 80 characters."),
+        type: wearableType.optional(),
+        ...draftFieldsSchema
+      }
+    },
+    async ({ itemId, ...input }) => {
+      try {
+        if (!itemId?.trim()) {
+          return errorResult("update_wearable_draft", "ITEM_ID_REQUIRED", "itemId is required.", "Nothing was changed.", [
+            "Pass the item_id create_wearable_draft returned."
+          ]);
+        }
+        if (Object.values(input).every((value) => value === void 0)) {
+          return errorResult("update_wearable_draft", "NOTHING_TO_UPDATE", "Pass at least one field to change.", "Nothing was changed.");
+        }
+        const { fields, uploads } = await toDraftFields(input);
+        const draft = await updateWearableDraft(itemId.trim(), fields);
+        return successResult(
+          "update_wearable_draft",
+          `Updated draft ${draft.itemId}.`,
+          describeDraft(draft, uploads),
+          draftNextSteps(draft)
+        );
+      } catch (error51) {
+        return wearableError("update_wearable_draft", error51, "The draft was not changed.", "UPDATE_WEARABLE_DRAFT_FAILED", {
+          item_id: itemId
+        });
+      }
+    }
+  );
+  server2.registerTool(
+    "submit_wearable_draft",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false
+      },
+      description: `Send one of the creator's own wearable drafts to Portals admin review. It never prices or publishes anything, and a draft in review can't be edited until it is approved or sent back. When the draft isn't ready it answers NOT_READY_TO_SUBMIT with every blocker at once, each saying who fixes it and where: a payout account to connect, sale settings and the Shop thumbnail to finish in the draft's Shop form on Portals, or draft fields to fix with update_wearable_draft. Needs the access key's "Shop wearable drafts" permission (portals.to/mcp).`,
+      inputSchema: {
+        itemId: external_exports.string().describe("The draft's item id, from create_wearable_draft.")
+      }
+    },
+    async ({ itemId }) => {
+      try {
+        if (!itemId?.trim()) {
+          return errorResult("submit_wearable_draft", "ITEM_ID_REQUIRED", "itemId is required.", "Nothing was submitted.", [
+            "Pass the item_id create_wearable_draft returned."
+          ]);
+        }
+        const submitted = await submitWearableDraft(itemId.trim());
+        return successResult(
+          "submit_wearable_draft",
+          `Draft ${submitted.itemId} is in review.`,
+          { item_id: submitted.itemId, status: submitted.status },
+          ["Portals notifies the creator when a moderator approves it or sends it back with notes."]
+        );
+      } catch (error51) {
+        return wearableError("submit_wearable_draft", error51, "The draft was not submitted.", "SUBMIT_WEARABLE_DRAFT_FAILED", {
+          item_id: itemId
+        });
+      }
+    }
+  );
   server2.registerTool(
     "get_game_economy_catalog",
     {
@@ -35387,7 +35786,7 @@ ${htmlSnippet}`,
           );
         }
         const draftRevision = expectedDraftRevision ?? (await getEconomyCatalog(gameId)).draftRevision;
-        const operationId = (0, import_node_crypto2.randomUUID)();
+        const operationId = (0, import_node_crypto3.randomUUID)();
         const catalog = action === "upsert" ? await upsertEconomyProduct({
           gameId,
           expectedDraftRevision: draftRevision,
@@ -35486,7 +35885,7 @@ ${htmlSnippet}`,
             { game_id: gameId, action }
           );
         }
-        const operationId = (0, import_node_crypto2.randomUUID)();
+        const operationId = (0, import_node_crypto3.randomUUID)();
         let sandbox;
         let receipt = null;
         switch (action) {
@@ -35626,6 +36025,59 @@ function catalogNextSteps(catalog) {
     "Real purchases also need the owner's monetization readiness (verified email, Stripe identity, account standing), which is only visible at portals.to/my-games."
   );
   return steps;
+}
+function wearableBudgets(report) {
+  const stats = report.stats;
+  if (!stats) return null;
+  const pairs = [
+    ["file_bytes", stats.fileBytes, report.limits.fileBytes],
+    ["triangles", stats.triangles, report.limits.triangles],
+    ["materials", stats.materials, report.limits.materials],
+    ["draw_calls", stats.primitives, report.limits.primitives],
+    ["largest_texture_side", stats.maxTextureSide, report.limits.textureSide],
+    ["decoded_texture_bytes", stats.decodedTextureBytes, report.limits.decodedTextureBytes],
+    ["animation_clips", stats.animations, report.limits.clips]
+  ];
+  const budgets = {};
+  for (const [name, used, limit] of pairs) {
+    if (typeof used === "number" && typeof limit === "number") budgets[name] = { used, limit };
+  }
+  return budgets;
+}
+function wearableRefusalNextSteps(error51) {
+  const payload = error51.payload;
+  switch (error51.code) {
+    case "ACCESS_KEY_PERMISSION_REQUIRED":
+      return [
+        `The creator turns on "Shop wearable drafts" for this access key at ${absoluteUrl(payload.grantUrl)}, signed in to Portals. Then retry. Generating a new key there turns it off again.`
+      ];
+    case "NOT_READY_TO_SUBMIT": {
+      const blockers = Array.isArray(payload.blockers) ? payload.blockers : [];
+      return blockers.map((blocker) => typeof blocker?.url === "string" ? `${blocker.message} ${absoluteUrl(blocker.url)}` : `${blocker?.message ?? ""} Use update_wearable_draft.`.trim());
+    }
+    case "VALIDATION_FAILED":
+      return ["Fix each field in server.errors and call the tool again."];
+    case "INVALID_WEARABLE":
+    case "INVALID_RIG":
+    case "GLB_TOO_LARGE":
+      return [
+        "The model failed upload ingest. Fix every issue in server.issues (or the bones in server.missing) and upload it again; validate_wearable checks a file without drafting it.",
+        "The standard: https://portals.to/documentation/web-games/wearable-standard. The rig: https://portals.to/wearable-standards."
+      ];
+    case "SALE_FIELDS_NOT_ALLOWED":
+      return [`Sale settings are set on Portals in the draft's Shop form${typeof payload.editUrl === "string" ? `: ${absoluteUrl(payload.editUrl)}` : "."}`];
+    case "ITEM_NOT_EDITABLE":
+      return [`The item is ${String(payload.currentStatus ?? "no longer a draft")}. Only drafts and rejected items can be changed or submitted.`];
+    case "TEAM_PROFILE_UNSUPPORTED":
+      return ["Official Portals items are authored in the Portals Shop form."];
+    case "RATE_LIMITED":
+      return [`Wait ${String(payload.retryAfter ?? "a few")} seconds, then retry.`];
+    case "ECONOMY_DISABLED":
+    case "FEATURE_DISABLED":
+      return ["The Portals Shop is switched off right now. Try again later."];
+    default:
+      return ["Confirm the MCP is authenticated (call authenticate)."];
+  }
 }
 
 // src/instructions.ts
