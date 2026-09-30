@@ -2,7 +2,7 @@
 
 Source: [https://portals.to/documentation/web-games/portals-sdk](https://portals.to/documentation/web-games/portals-sdk) — verbatim copy of the official Portals documentation.
 
-The Portals SDK connects a hosted web game to the Portals player and host. It supports identity, saved progress, casual scores, leaderboard reads, analytics events, game-specific Coin products, and closing the game from either standalone or in-room play. For setup and the complete purchase contract, see [Sell game products for Coins](https://portals.to/documentation/web-games/in-game-coins). For real-time multiplayer, in-game text chat, and voice chat, see [Multiplayer, Chat, and Voice](https://portals.to/documentation/web-games/multiplayer-and-voice). To put the player's Guardian avatar in a Three.js game — wearables, animation and a character controller — see [Guardian Avatars](https://portals.to/documentation/web-games/guardian-avatars).
+The Portals SDK connects a hosted web game to the Portals player and host. It supports identity, saved progress, casual scores, leaderboard reads, analytics events, game-specific Coin products, and closing the game from either standalone or in-room play. For setup and the complete purchase contract, see [Sell game products for Coins](https://portals.to/documentation/web-games/in-game-coins). For real-time multiplayer, in-game text chat, and voice chat, see [Multiplayer, Chat, and Voice](https://portals.to/documentation/web-games/multiplayer-and-voice). To put the player's Portals avatar in a Three.js game — wearables, animation and a character controller — see [Portals Avatars](https://portals.to/documentation/web-games/guardian-avatars).
 
 Portals injects the SDK into every processed preview and published bundle. Your project includes it from its own game origin:
 
@@ -13,13 +13,13 @@ Portals injects the SDK into every processed preview and published bundle. Your 
 
 Do not download or edit `_portals/sdk.js`. Portals replaces the managed copy when it processes or publishes the project.
 
-Guardian avatars ship as a second, optional managed script. Add it beside this one only if you use it:
+Portals avatars ship as a second, optional managed script. Add it beside this one only if you use it:
 
 ```html
 <script src="./_portals/guardians-sdk.js"></script>
 ```
 
-It gives you the global `PortalsGuardians` — avatars, wearables, animation and a character controller, gated by `await PortalsGuardians.ready()` the same way `Portals` is gated by `await Portals.ready()`. See [Guardian Avatars](https://portals.to/documentation/web-games/guardian-avatars).
+It gives you the global `PortalsGuardians` — avatars, wearables, animation and a character controller, gated by `await PortalsGuardians.ready()` the same way `Portals` is gated by `await Portals.ready()`. See [Portals Avatars](https://portals.to/documentation/web-games/guardian-avatars).
 
 ## Threaded WebAssembly and Unreal web exports
 
@@ -167,9 +167,9 @@ const label = player.username
 console.log(label, player.avatar);
 ```
 
-`username` is the active public profile handle without the `@`. `avatar` is the playable look saved on the Portals `/avatar` screen: Guardian body configuration plus selected wearables, or a selected full-avatar replacement. It is `null` for a guest. The older `avatarUrl` field is only the player's 2D profile image; do not load it as a 3D character.
+`username` is the active public profile handle without the `@`. `avatar` is the playable look saved on the Portals `/avatar` screen: Portals avatar body configuration plus selected wearables, or a selected full-avatar replacement. It is `null` for a guest. The older `avatarUrl` field is only the player's 2D profile image; do not load it as a 3D character.
 
-The first signed-in read is cached for that hosted-game load. Call it again after `Portals.identity.requestLogin()`; if the player changes their saved look in another tab, reopen or reload the game. To render it in a Three.js game, pass the result to `avatars.createAvatarFromPlayer(player)` from the [Guardian avatar SDK](https://portals.to/documentation/web-games/guardian-avatars#load-the-current-portals-player).
+The first signed-in read is cached for that hosted-game load. Call it again after `Portals.identity.requestLogin()`; if the player changes their saved look in another tab, reopen or reload the game. To render it in a Three.js game, pass the result to `avatars.createAvatarFromPlayer(player)` from the [Portals avatar SDK](https://portals.to/documentation/web-games/guardian-avatars#load-the-current-portals-player).
 
 ### Open the trusted avatar picker
 

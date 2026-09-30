@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Avatars"
+  short_description: "Player avatars, wearables, and a character controller in Three.js"
+  default_prompt: "Use $portals-avatars to put the player's Portals avatar in my Three.js game."

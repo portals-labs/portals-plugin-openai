@@ -20,11 +20,11 @@ A wearable that follows it behaves the same way on all of them, with no code in 
 | Secondary motion (spring bones: capes, hair, tails) | In development |
 | Particle emitters and trails | In development |
 
-Everything marked in development is specified here so files can be authored against it. Each part is enabled by the Guardian SDK release named in the [changelog](https://portals.to/documentation/web-games/guardian-avatars-changelog).
+Everything marked in development is specified here so files can be authored against it. Each part is enabled by the Portals avatar SDK release named in the [changelog](https://portals.to/documentation/web-games/guardian-avatars-changelog).
 
 ## Principles
 
-1. **A wearable is data, never code.** The GLB describes what should happen; the Guardian SDK does it. Wearables may not contain:
+1. **A wearable is data, never code.** The GLB describes what should happen; the Portals avatar SDK does it. Wearables may not contain:
    - scripts;
    - custom shaders;
    - external file references;
@@ -67,7 +67,7 @@ Every upload is validated on the server. Portals then derives the files avatars 
 | File | Contents | Used by |
 | --- | --- | --- |
 | Static | The wearable in rest pose on the canonical rig, with no clips, springs or effects | thumbnails, reduced motion, distant avatars, games on older SDKs |
-| Dynamic | The validated file with its declared behaviour | every current Guardian surface and game |
+| Dynamic | The validated file with its declared behaviour | every current Portals avatar surface and game |
 
 A wearable with nothing dynamic has only a static file. Both files are immutable, and each is named by its content. The creator's original upload is kept privately so it can be processed again when the standard adds features.
 

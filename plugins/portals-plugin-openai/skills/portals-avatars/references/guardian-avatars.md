@@ -1,8 +1,8 @@
-# Guardian Avatars
+# Portals Avatars
 
 Source: [https://portals.to/documentation/web-games/guardian-avatars](https://portals.to/documentation/web-games/guardian-avatars) — the official Portals documentation, extended with SDK reference material. Version markers like (0.36.0) name the release a feature first shipped in; a game pinned below that version does not have it. The [changelog](https://portals.to/documentation/web-games/guardian-avatars-changelog) lists every release. Types: [portals.to/portals-sdk/guardians.d.ts](https://portals.to/portals-sdk/guardians.d.ts) — the source of truth for the API. Read it before writing code against a method not shown here.
 
-The Guardian avatar SDK renders the same avatars players wear across Portals — body types, skin/hair/eye colour, hair styles, the wearables system, retargeted locomotion clips, facial animation, and a first/third-person character controller with the Portals feel.
+The Portals avatar SDK renders the same avatars players wear across Portals — body types, skin/hair/eye colour, hair styles, the wearables system, retargeted locomotion clips, facial animation, and a first/third-person character controller with the Portals feel.
 
 It is a Three.js library, not a standalone renderer: you own the scene, camera and render loop, and the SDK adds avatars to it. For sign-in, saved progress, leaderboards and host control, see [Portals SDK](https://portals.to/documentation/web-games/portals-sdk).
 
@@ -64,7 +64,7 @@ To control the version on every path, pin it in a `portals.json` at the project 
 { "guardiansSdk": "<version>" }
 ```
 
-The pin wins everywhere — editor, AI builder, plugin pushes, zip imports and GitHub builds — so the version you developed against is the version that publishes. Pinning a version that was never released fails the publish with an error naming the current release. Always pin a Guardian game you push.
+The pin wins everywhere — editor, AI builder, plugin pushes, zip imports and GitHub builds — so the version you developed against is the version that publishes. Pinning a version that was never released fails the publish with an error naming the current release. Always pin a Portals avatar game you push.
 
 The current release, and the Three.js version it is built against, are published at `https://portals.to/portals-sdk/guardians/current.json` as `{ "version": "…", "three": "…" }`. Read it instead of guessing a number.
 
@@ -95,7 +95,7 @@ Then record the same version in `portals.json`. When you push the game to Portal
 
 ## Load the current Portals player
 
-`Portals.player.get()` reads the player's active public username and the playable look saved on `/avatar`. `createAvatarFromPlayer()` turns that result into the exact Guardian configuration and wearables — or the selected full-avatar asset — in one call:
+`Portals.player.get()` reads the player's active public username and the playable look saved on `/avatar`. `createAvatarFromPlayer()` turns that result into the exact Portals avatar configuration and wearables — or the selected full-avatar asset — in one call:
 
 ```js
 await Portals.ready();
@@ -148,7 +148,7 @@ customizeButton.addEventListener("click", async () => {
 
 Choosing **Done** changes the player's avatar across Portals, not just inside the current game; **Cancel** discards the draft. Catch rejection so cancelation, an unavailable host, or a failed save does not interrupt play. The editor preview intentionally rejects `openPicker()`; keep the preview playable on rejection and verify the interaction in a published game host.
 
-The game never gets raw inventory, owned-instance IDs, marketplace operations, credentials, or direct global item mutation. `player.avatar.wearables` is a sanitized, render-ready snapshot of the equipped look — not inventory or ownership proof. The Portals-owned picker only offers eligible items from the signed-in player's existing Shop inventory, and the server validates ownership and compatibility again. The Guardian SDK's `wearables.equip()` changes an avatar object inside the game; it does not change the player's global Portals look.
+The game never gets raw inventory, owned-instance IDs, marketplace operations, credentials, or direct global item mutation. `player.avatar.wearables` is a sanitized, render-ready snapshot of the equipped look — not inventory or ownership proof. The Portals-owned picker only offers eligible items from the signed-in player's existing Shop inventory, and the server validates ownership and compatibility again. The Portals avatar SDK's `wearables.equip()` changes an avatar object inside the game; it does not change the player's global Portals look.
 
 ## Starter
 
@@ -202,7 +202,7 @@ Loading a second copy from a CDN will not work — the game CSP admits no extern
 
 ## Assets load through Portals
 
-Guardian models, wearables and animation clips live on Portals storage. Published games run under `connect-src 'self'` and cannot fetch from arbitrary hosts, so the SDK rewrites Portals CDN URLs onto managed same-origin paths that Portals serves for you (`/_portals/cdn/…`, `/_portals/media/…`) and loads wearables in the Portals storage bucket directly, which the game's content policy allows (0.47.1). This is automatic — pass ordinary Portals URLs and they resolve, byte-for-byte the asset the player owns. Hand-written `fetch()` to a CDN works in no environment.
+Portals avatar models, wearables and animation clips live on Portals storage. Published games run under `connect-src 'self'` and cannot fetch from arbitrary hosts, so the SDK rewrites Portals CDN URLs onto managed same-origin paths that Portals serves for you (`/_portals/cdn/…`, `/_portals/media/…`) and loads wearables in the Portals storage bucket directly, which the game's content policy allows (0.47.1). This is automatic — pass ordinary Portals URLs and they resolve, byte-for-byte the asset the player owns. Hand-written `fetch()` to a CDN works in no environment.
 
 Two consequences worth knowing:
 
@@ -239,7 +239,7 @@ await avatar.wearables.unequip('hat');          // by slot or id
 avatar.wearables.getEquipped();
 ```
 
-Equipping replaces whatever occupies the item's slots, hides the body meshes the slot covers, and re-binds skinned wearables to the avatar skeleton. Multi-slot items (dresses, full-body suits) declare every slot they occupy via `slots`. `urlFemale` is used automatically on a female Guardian.
+Equipping replaces whatever occupies the item's slots, hides the body meshes the slot covers, and re-binds skinned wearables to the avatar skeleton. Multi-slot items (dresses, full-body suits) declare every slot they occupy via `slots`. `urlFemale` is used automatically on a female Portals avatar.
 
 Right-hand items get a carry pose and a use action inferred from the item name — an axe swings, a pistol shoots — or set `handItemType` explicitly. Listen for the action with `controller.onItemUse`.
 
@@ -254,11 +254,11 @@ Some back wearables — fish-tank backpacks, shoulder pets, rocket packs — car
   await avatar.wearables.equip({ id: 'jetpack', name: 'Jetpack', slot: 'back', url: './jetpack.glb', animated: true });
   ```
 
-The animation runs from `avatars.update(dt)` and stops when the item comes off. It only moves nodes inside the wearable, so rig the moving part to its own small skeleton and attach it rigidly under a Guardian bone; it cannot pose the avatar. Games pinned below 0.47.0 show these items static.
+The animation runs from `avatars.update(dt)` and stops when the item comes off. It only moves nodes inside the wearable, so rig the moving part to its own small skeleton and attach it rigidly under a Portals avatar bone; it cannot pose the avatar. Games pinned below 0.47.0 show these items static.
 
 ## Animation
 
-The Guardian models ship without clips. Clips are **declared at avatar creation and fetched on first use**, one GLB per behaviour — a game that only walks and jumps fetches one locomotion file and never downloads the swim, sit or spell clips at all. `createAvatar` resolves as soon as the body is on screen; call `avatars.preloadAnimations()` to pay the cost behind a loading screen instead.
+The Portals avatar models ship without clips. Clips are **declared at avatar creation and fetched on first use**, one GLB per behaviour — a game that only walks and jumps fetches one locomotion file and never downloads the swim, sit or spell clips at all. `createAvatar` resolves as soon as the body is on screen; call `avatars.preloadAnimations()` to pay the cost behind a loading screen instead.
 
 ```js
 avatar.animations.getNames();             // available — loaded OR declared
@@ -270,7 +270,7 @@ await avatars.preloadAnimations();        // everything
 
 `play()` returns `false` until the bytes arrive and the current pose simply holds — **do not treat a `false` return as an error**. Poll `isLoaded()` or `await ensure()` if you need certainty.
 
-Custom clips work the same way, and any Mixamo- or UE5-mannequin-rigged GLB is retargeted onto the Guardian rig automatically:
+Custom clips work the same way, and any Mixamo- or UE5-mannequin-rigged GLB is retargeted onto the Portals avatar rig automatically:
 
 ```js
 await avatar.animations.load([
@@ -497,7 +497,7 @@ avatars.createController(avatar, {
 
 ## NPCs
 
-`createNPC(avatarOptions, npcOptions)` / `createNPCFromUrl(url, extra, npcOptions)` load the same Guardian as `createAvatar` (wearables, face, animations — all of it) wrapped in a code-driven `NPCController` instead of player input. The shared `avatars.update(dt)` drives them; nothing extra to call.
+`createNPC(avatarOptions, npcOptions)` / `createNPCFromUrl(url, extra, npcOptions)` load the same Portals avatar as `createAvatar` (wearables, face, animations — all of it) wrapped in a code-driven `NPCController` instead of player input. The shared `avatars.update(dt)` drives them; nothing extra to call.
 
 ```js
 const npc = await avatars.createNPCFromUrl(playerLookUrl, { position: { x: 4, y: 0, z: 2 } });

@@ -1,6 +1,6 @@
 ---
 name: portals-web-games
-description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards and host UI safe areas, Portals.economy Coin microtransactions and product catalogs, Portals.net multiplayer, Portals.voice, Guardian avatars, Shop wearable drafts, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
+description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards and host UI safe areas, Portals.economy Coin microtransactions and product catalogs, Portals.net multiplayer, Portals.voice, Portals avatars, Shop wearable drafts, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
 ---
 
 # Portals Web Games
@@ -9,7 +9,7 @@ Use the `portals-web-games` MCP tools for remote Portals state and ordinary work
 
 ## Load the platform rules
 
-Before creating or changing a game, read [references/portals-web-games.md](references/portals-web-games.md) completely. Treat it as authoritative for the injected SDK, host-owned UI reserve, Coin products, sandbox restrictions, multiplayer and voice limits, Guardian avatar integration, local development, and generated-asset rules. Those instructions are bundled from this MCP project's `src/instructions.ts`.
+Before creating or changing a game, read [references/portals-web-games.md](references/portals-web-games.md) completely. Treat it as authoritative for the injected SDK, host-owned UI reserve, Coin products, sandbox restrictions, multiplayer and voice limits, Portals avatar integration, local development, and generated-asset rules. Those instructions are bundled from this MCP project's `src/instructions.ts`.
 
 For the full official documentation on one subsystem, use the dedicated skill instead of guessing at the API:
 
@@ -17,9 +17,9 @@ For the full official documentation on one subsystem, use the dedicated skill in
 - `portals-multiplayer-and-voice` — `Portals.net` sessions and channels, text chat, `Portals.voice`, dev-token local testing.
 - `portals-server-scripts` — a root `server.js` referee for lobbies, ready checks, authoritative countdowns, and kicking.
 - `portals-server-sim` — running the game simulation itself on the server: shared physics, snapshots, client prediction, and fallback to host authority.
-- `portals-guardian-avatars` — Guardian avatars, wearables, animation, and the character controller in Three.js.
+- `portals-avatars` — Portals avatars, wearables, animation, and the character controller in Three.js.
 - `portals-game-economy` — selling in-game products for Coins: the product catalog, `Portals.economy` purchases, and the purchase sandbox.
-- `portals-wearables` — making Guardian wearables for the Portals Shop: the wearable standard, the rig, budgets, and checking, drafting and submitting them with `validate_wearable`, `create_wearable_draft`, `update_wearable_draft` and `submit_wearable_draft`.
+- `portals-wearables` — making Portals avatar wearables for the Portals Shop: the wearable standard, the rig, budgets, and checking, drafting and submitting them with `validate_wearable`, `create_wearable_draft`, `update_wearable_draft` and `submit_wearable_draft`.
 
 ## Choose the workflow
 

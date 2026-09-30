@@ -7,7 +7,7 @@ description: Tune procedural animation live inside a Portals web game with the P
 
 A procedural pose is a pure function of *numbers* (carry tables, grip offsets, recoil shares) and *inputs* (pitch, kick, scoped). No authored clip can be "the" gun-holding animation, because the hold has to survive things a clip cannot know — camera pitch, strafe direction, recoil, scope state. Those numbers get found by running the game and changing them, so the Pose Tuner puts a panel in the running game that binds the live tables the frame loop already reads: a slider mutates the table in place and the very next frame shows it.
 
-Read [references/pose-tuner.md](references/pose-tuner.md) for the full API, the panel reference, and the caveats. It pairs with `$portals-guardian-avatars` — bone editing targets a Guardian rig, and its export is the `boneAdjust` shape `avatar.animations.load` takes.
+Read [references/pose-tuner.md](references/pose-tuner.md) for the full API, the panel reference, and the caveats. It pairs with `$portals-avatars` — bone editing targets a Portals avatar rig, and its export is the `boneAdjust` shape `avatar.animations.load` takes.
 
 ## It is a dev tool, not runtime
 
@@ -34,7 +34,7 @@ aimWeapon(avatar, tuner?.apply(inputs) ?? inputs);   // forced inputs override p
 const dt = tuner?.dt(rawDt) ?? rawDt;                // pause / single-step / slow-mo
 ```
 
-`attachBoneEditor` adds a 3D gizmo for bone rotations, bone positions and held-weapon placement. Its per-frame pass writes bones, so it obeys the same ordering rule as `Ragdoll` and `aimWeapon` — it must run after the mixer tick or be silently overwritten. On Guardian SDK 0.42.0+ register it and the ordering is the SDK's promise:
+`attachBoneEditor` adds a 3D gizmo for bone rotations, bone positions and held-weapon placement. Its per-frame pass writes bones, so it obeys the same ordering rule as `Ragdoll` and `aimWeapon` — it must run after the mixer tick or be silently overwritten. On Portals avatar SDK 0.42.0+ register it and the ordering is the SDK's promise:
 
 ```js
 avatars.onAfterUpdate(() => tuner?.boneEditor?.update());
@@ -98,5 +98,5 @@ tuner.attachBoneEditor({
 - The panel is a tuning surface, never a data format. What it produces is a paste-ready diff for the committed source; the committed source stays the source of truth.
 - Export diffs are measured against what the code held at bind time, so a persisted edit from an earlier session still reads as changed — nothing tuned can silently fail to make it back.
 - Bone rotations export as `boneAdjust` and paste straight into clip registration. Bone **positions** do not — `boneAdjust` cannot bake them, so apply them at runtime.
-- The gizmo needs `three/addons/controls/TransformControls.js`, a hosted addon from Guardian SDK 0.42.0. On an older pin the import fails, the editor falls back to sliders, and only a `console.warn` says so.
+- The gizmo needs `three/addons/controls/TransformControls.js`, a hosted addon from Portals avatar SDK 0.42.0. On an older pin the import fails, the editor falls back to sliders, and only a `console.warn` says so.
 - Bones a later procedural pass rewrites (an IK'd arm, an aim-bent spine) show that pass, not the edit. Tune those through their tables instead.
