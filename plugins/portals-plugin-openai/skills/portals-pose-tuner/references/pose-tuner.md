@@ -1,6 +1,6 @@
 # Pose Tuner
 
-Source: [https://portals.to/documentation/web-games/pose-tuner](https://portals.to/documentation/web-games/pose-tuner) — the official Portals documentation. The bone editor's `boneAdjust` export and its post-mixer ordering rule belong to the Guardian avatar SDK; see [Guardian Avatars](https://portals.to/documentation/web-games/guardian-avatars) for that side.
+Source: [https://portals.to/documentation/web-games/pose-tuner](https://portals.to/documentation/web-games/pose-tuner) — the official Portals documentation. The bone editor's `boneAdjust` export and its post-mixer ordering rule belong to the Portals avatar SDK; see [Portals Avatars](https://portals.to/documentation/web-games/guardian-avatars) for that side.
 
 The Pose Tuner is an in-game panel for tuning procedural animation: the number tables your pose code reads every frame, the live inputs that drive them, and — through a 3D gizmo — bone rotations, bone positions and the placement of a held weapon. You tune in the real renderer, on the real rig, and export exactly what changed as a paste-ready snippet. Your committed source stays the source of truth; the panel is never a data format.
 
@@ -103,7 +103,7 @@ tuner.attachBoneEditor({
 });
 ```
 
-`three/addons/controls/TransformControls.js` is part of the managed Three.js runtime from Guardian SDK 0.42.0, so the import resolves in hosted previews and in local projects that use the managed import map. On an older pin the import fails, the editor falls back to sliders, and only a `console.warn` says so.
+`three/addons/controls/TransformControls.js` is part of the managed Three.js runtime from Portals avatar SDK 0.42.0, so the import resolves in hosted previews and in local projects that use the managed import map. On an older pin the import fails, the editor falls back to sliders, and only a `console.warn` says so.
 
 - **Bone rotations** are stored per pose as Euler XYZ radians and exported as a `boneAdjust` map — exactly the shape [`avatar.animations.load`](https://portals.to/documentation/web-games/guardian-avatars) takes at clip registration, and applied with the same math, so what you see while dragging is what the baked clip will look like.
 - **Bone positions** are local offsets over the clip, exported separately (`boneAdjust` cannot bake positions — apply them at runtime).
@@ -136,7 +136,7 @@ Each entry is `{ id, label, mode: 'translate' | 'rotate', getObject(), fold(obje
 
 `poseId` is whichever stance is active, so a single target covers the hip mount, the ADS mount and every other pose — as long as it folds into a per-pose table.
 
-Run the editor's per-frame pass in the post-mixer slot. On Guardian SDK 0.42.0 and later, register it once and the ordering is the SDK's promise:
+Run the editor's per-frame pass in the post-mixer slot. On Portals avatar SDK 0.42.0 and later, register it once and the ordering is the SDK's promise:
 
 ```js
 avatars.onAfterUpdate(() => tuner.boneEditor?.update());
@@ -161,6 +161,6 @@ Export diffs are always measured against what the *code* held at bind time — p
 
 ## Caveats
 
-- Keystrokes inside the panel are kept from the game where possible, but a capture-phase listener registered before the tuner mounts (the Guardian controller's input is one) still sees them first. Pause time while typing in a number field, or use the sliders.
+- Keystrokes inside the panel are kept from the game where possible, but a capture-phase listener registered before the tuner mounts (the Portals avatar controller's input is one) still sees them first. Pause time while typing in a number field, or use the sliders.
 - `tuner.dt()` pausing stops what you step with that delta; eases timed off wall-clock keep moving. Force their inputs instead (that is what a `kick` control is for).
 - Bones a later procedural pass rewrites (an IK'd arm, an aim-bent spine) show that pass, not your edit — tune those through their tables, or edit them under a stance the pass leaves alone.

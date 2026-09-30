@@ -8,12 +8,12 @@ This is the MCP server's bundled instruction set, copied from `src/instructions.
 - [Host-owned Portals controls](#host-owned-portals-controls)
 - [Multiplayer — Portals.net](#multiplayer--portalsnet)
 - [Voice — Portals.voice](#voice--portalsvoice)
-- [Guardian avatars — the 3D character SDK](#guardian-avatars--the-3d-character-sdk)
-- [Guardian appearance, wearables, faces](#guardian-appearance-wearables-faces)
-- [Guardian animation](#guardian-animation)
-- [Guardian character controller](#guardian-character-controller)
-- [Guardians together with the Portals SDK](#guardians-together-with-the-portals-sdk)
-- [Guardian SDK versions and local development](#guardian-sdk-versions-and-local-development)
+- [Portals avatars — the 3D character SDK](#portals-avatars--the-3d-character-sdk)
+- [Portals avatar appearance, wearables, faces](#portals-avatar-appearance-wearables-faces)
+- [Portals avatar animation](#portals-avatar-animation)
+- [Portals avatar character controller](#portals-avatar-character-controller)
+- [Portals avatars together with the Portals SDK](#portals-avatars-together-with-the-portals-sdk)
+- [Portals avatar SDK versions and local development](#portals-avatar-sdk-versions-and-local-development)
 - [Testing multiplayer on a local dev server](#testing-multiplayer-on-a-local-dev-server)
 - [Generated assets — art, audio, and 3D models](#generated-assets--art-audio-and-3d-models)
 - [Marketplace assets](#marketplace-assets)
@@ -139,11 +139,11 @@ Portals owns the microphone and permissions — never call getUserMedia or use W
 
 Availability: Portals.net works on the game page, inside Portals rooms (room session), and in editor preview; Portals.voice only on the game page (rooms run their own voice). Neither exists outside Portals — wrap both join() calls in try/catch and keep the game playable without them.
 
-## Guardian avatars — the 3D character SDK
+## Portals avatars — the 3D character SDK
 
-Every pushed game also gets the Guardian avatar SDK: the same avatars players wear across Portals — body types, skin/hair/eye colour, hair styles, the wearables system, retargeted locomotion and facial animation, and a first/third-person character controller with the Portals feel. It is a Three.js library, not a renderer: the game owns the scene, camera and render loop. Reach for it instead of hand-rolling a character whenever a 3D game wants a player avatar.
+Every pushed game also gets the Portals avatar SDK: the same avatars players wear across Portals — body types, skin/hair/eye colour, hair styles, the wearables system, retargeted locomotion and facial animation, and a first/third-person character controller with the Portals feel. It is a Three.js library, not a renderer: the game owns the scene, camera and render loop. Reach for it instead of hand-rolling a character whenever a 3D game wants a player avatar.
 
-Load it beside the SDK. Both files are managed by Portals and stamped into the bundle on every push — never modify, bundle, or ship your own copy. The stamped SDK is versioned, and an unpinned push re-stamps it at the current release (see "Guardian SDK versions and local development" below):
+Load it beside the SDK. Both files are managed by Portals and stamped into the bundle on every push — never modify, bundle, or ship your own copy. The stamped SDK is versioned, and an unpinned push re-stamps it at the current release (see "Portals avatar SDK versions and local development" below):
 
   <script src="./_portals/sdk.js"></script>
   <script src="./_portals/guardians-sdk.js"></script>
@@ -160,7 +160,7 @@ From an ES module (<script type="module" src="./game.js">) import by name instea
 
 Portals injects the import map that resolves those specifiers when it processes a push, and re-merges it on later pushes — so keep the <script type="importmap"> block that comes back in a pulled index.html. Hand-authoring it means mapping "three" to ./_portals/vendor/three/three.module.js, "three/addons/" to ./_portals/vendor/three/addons/, and "@portals/avatars" to ./_portals/guardians-sdk.module.js. Map the specifier at the module, not at guardians-sdk.js — that one is the classic-script loader.
 
-Never load Three.js from a CDN or bundle it in a pushed game: script-src is 'self', and the managed runtime must be the only copy on the page. (A local dev server is the one exception — see "Guardian SDK versions and local development".) Only three addons are hosted — three/addons/controls/OrbitControls.js, three/addons/loaders/GLTFLoader.js, three/addons/utils/BufferGeometryUtils.js; any other three/addons/* path fails at runtime.
+Never load Three.js from a CDN or bundle it in a pushed game: script-src is 'self', and the managed runtime must be the only copy on the page. (A local dev server is the one exception — see "Portals avatar SDK versions and local development".) Only three addons are hosted — three/addons/controls/OrbitControls.js, three/addons/loaders/GLTFLoader.js, three/addons/utils/BufferGeometryUtils.js; any other three/addons/* path fails at runtime.
 
 Minimum viable game:
 
@@ -183,9 +183,9 @@ Minimum viable game:
     renderer.render(scene, camera);
   });
 
-Assets: Guardian models, wearables and clips live on the Portals CDN, and a published game runs under connect-src 'self' — the SDK rewrites its own asset URLs onto same-origin managed paths, so pass ordinary Portals URLs and never fetch a CDN yourself. For URLs you hand to the browser (a wearable thumbnail in an <img>, since img-src is 'self' too) call resolveAssetUrl(url) first. Relative, blob: and data: URLs pass through untouched, so assets inside your own bundle need nothing.
+Assets: Portals avatar models, wearables and clips live on the Portals CDN, and a published game runs under connect-src 'self' — the SDK rewrites its own asset URLs onto same-origin managed paths, so pass ordinary Portals URLs and never fetch a CDN yourself. For URLs you hand to the browser (a wearable thumbnail in an <img>, since img-src is 'self' too) call resolveAssetUrl(url) first. Relative, blob: and data: URLs pass through untouched, so assets inside your own bundle need nothing.
 
-## Guardian appearance, wearables, faces
+## Portals avatar appearance, wearables, faces
 
 - avatar.configure({ bodyType, skinColor, hairStyle, hairColor, eyeColor, facialHair }) applies a whole look; setSkinColor / setHairColor / setEyeColor / setHairStyle / setFacialHair set one at a time and chain. Colours take a preset id or any CSS colour.
 - avatar.getHairStyles() and getFacialHairStyles() are read off the loaded model and differ per body type — never hardcode style ids.
@@ -195,7 +195,7 @@ Assets: Guardian models, wearables and clips live on the Portals CDN, and a publ
 - Right-hand items get a carry pose and a use action inferred from the name (axe → melee, pistol → gun) unless handItemType says otherwise; handle the action with controller.onItemUse.
 - avatar.face.setEmotion('neutral' | 'smile' | 'serious' | 'frown'), setTalking(bool) (drive it from dialogue or voice), setAutoBlink(bool).
 
-## Guardian animation
+## Portals avatar animation
 
 Clips are declared at avatar creation and fetched on first use, one GLB per behaviour, so a game that only walks and jumps downloads one file and never pulls the swim or sword clips at all.
 
@@ -239,10 +239,10 @@ Clips are declared at avatar creation and fetched on first use, one GLB per beha
   zombie: zombieSpawn zombieIdle zombieBite zombieScratch plus the 8-way zombieWalk zombieWalkBack zombieWalkLeft zombieWalkRight zombieWalkFwdLeft zombieWalkFwdRight zombieWalkBackLeft zombieWalkBackRight and the same eight as zombieRun*
   monster: monsterTransform
 - Two name traps: talkGesture is the body gesture while talking is the face (avatar.face.setTalking), and climbTop is the ledge grab (always loaded) while climbUp is ladder climbing (in the climb set).
-- Custom clips work the same way — await avatar.animations.load([{ name: 'wave', url: './anims/wave.glb', loop: false }]) — and Mixamo- or UE5-mannequin-rigged GLBs are retargeted onto the Guardian rig automatically.
+- Custom clips work the same way — await avatar.animations.load([{ name: 'wave', url: './anims/wave.glb', loop: false }]) — and Mixamo- or UE5-mannequin-rigged GLBs are retargeted onto the Portals avatar rig automatically.
 - The run band has two styles: 'run4' (default, a natural run) and 'jog2' (a relaxed jog). Pick with new PortalsAvatars({ runStyle: 'jog2' }) or switch live with await avatars.setRunStyle('jog2').
 
-## Guardian character controller
+## Portals avatar character controller
 
 createController gives WASD movement, sprint, jump, crouch and a first/third-person camera rig; speeds clamp to MOVEMENT_LIMITS.
 
@@ -259,9 +259,9 @@ createController gives WASD movement, sprint, jump, crouch and a first/third-per
 - raycast is what enables ledge climbing: both shoulders must find the ledge and the probe only runs while airborne, so a climb always follows a jump or a fall. Without the hook the character cannot climb at all.
 - avatars.removeAvatar(avatar) disposes one avatar with its controller and GPU resources; avatars.dispose() tears down everything when leaving a scene.
 
-## Guardians together with the Portals SDK
+## Portals avatars together with the Portals SDK
 
-They are complementary: Portals handles identity, saves, leaderboards, multiplayer and voice; the Guardian SDK handles the character.
+They are complementary: Portals handles identity, saves, leaderboards, multiplayer and voice; the Portals avatar SDK handles the character.
 
   await Portals.ready();
   const saved = await Portals.loadState();
@@ -272,7 +272,7 @@ For multiplayer avatars, send avatar.getConfig() over Portals.net and build remo
 
 TypeScript declarations for editor autocomplete: curl -o guardians.d.ts https://portals.to/portals-sdk/guardians.d.ts — it is the authoritative API surface, worth reading before using a method not shown above.
 
-## Guardian SDK versions and local development
+## Portals avatar SDK versions and local development
 
 The avatar SDK is released in versions. Only games built in the Portals editor or AI builder are frozen on the version they were first stamped with. A push (like a zip import or GitHub build) replaces the whole bundle and re-stamps the SDK at the current platform release, so an unpinned pushed game can change SDK version on any push. Pin the version in a portals.json at the project root and push — the pin wins on every path:
 
@@ -280,7 +280,7 @@ The avatar SDK is released in versions. Only games built in the Portals editor o
 
 portals.json is an ordinary project file that travels with every push, so the version a game was developed against locally is the version that runs on Portals. Never invent a version number: pinning an unreleased version fails the push with an error that names the current release. The current release is 0.20.0, built against three 0.178.0.
 
-Every released version is downloadable, so a Guardian game CAN run on a local dev server:
+Every released version is downloadable, so a Portals avatar game CAN run on a local dev server:
 
   https://portals.to/portals-sdk/guardians/<version>/guardians-sdk.js
   https://portals.to/portals-sdk/guardians/<version>/guardians-sdk.module.js
@@ -305,7 +305,7 @@ Three pieces make the local setup, and all of it is push-safe (no cleanup needed
   curl -o _portals/guardians-sdk.js https://portals.to/portals-sdk/guardians/0.20.0/guardians-sdk.js
   curl -o _portals/guardians-sdk.module.js https://portals.to/portals-sdk/guardians/0.20.0/guardians-sdk.module.js
 
-2. Direct CDN assets while local. The downloaded SDK is the sandbox build: it rewrites Guardian model/wearable/clip URLs onto same-origin /_portals/cdn/... paths that only exist on Portals. Switch that off when the page is not on Portals — the guard is what makes it push-safe:
+2. Direct CDN assets while local. The downloaded SDK is the sandbox build: it rewrites Portals avatar model/wearable/clip URLs onto same-origin /_portals/cdn/... paths that only exist on Portals. Switch that off when the page is not on Portals — the guard is what makes it push-safe:
 
   import { setAssetRewriting } from '@portals/avatars';
   if (['localhost', '127.0.0.1'].includes(location.hostname)) setAssetRewriting('never');

@@ -1,18 +1,18 @@
 ---
 name: portals-wearables
-description: Make wearables for the Portals Shop — hats, glasses, tops, back items and full avatars for the Guardian — to the Portals wearable standard, then check, draft and submit them with the portals-web-games MCP tools. Use when authoring or exporting a wearable GLB for Portals, the Portals rig template new-rig.glb, skinned or rigid attachment, wearable budgets, PORTALS_wearable clips, VRMC_springBone springs, emitters and trails, validate_wearable, create_wearable_draft, update_wearable_draft, submit_wearable_draft, the Shop wearable drafts access-key permission, or a wearable upload the Shop rejects.
+description: Make wearables for the Portals Shop — hats, glasses, tops, back items and full avatars for the Portals avatar — to the Portals wearable standard, then check, draft and submit them with the portals-web-games MCP tools. Use when authoring or exporting a wearable GLB for Portals, the Portals rig template new-rig.glb, skinned or rigid attachment, wearable budgets, PORTALS_wearable clips, VRMC_springBone springs, emitters and trails, validate_wearable, create_wearable_draft, update_wearable_draft, submit_wearable_draft, the Shop wearable drafts access-key permission, or a wearable upload the Shop rejects.
 ---
 
 # Portals wearables
 
-A Portals wearable is one GLB that follows the **Portals wearable standard**, the contract between the file and every place a Guardian appears: `/avatar`, the Shop, the Play lobby and games. Read [references/wearable-standard.md](references/wearable-standard.md) before authoring or fixing a file. It is the official spec, verbatim, and the public copy is at https://portals.to/documentation/web-games/wearable-standard.
+A Portals wearable is one GLB that follows the **Portals wearable standard**, the contract between the file and every place a Portals avatar appears: `/avatar`, the Shop, the Play lobby and games. Read [references/wearable-standard.md](references/wearable-standard.md) before authoring or fixing a file. It is the official spec, verbatim, and the public copy is at https://portals.to/documentation/web-games/wearable-standard.
 
 The `portals-web-games` MCP tools take a wearable from a local file to Portals review on the creator's own account. **Price and release happen on Portals, not here.**
 
 ## What works today
 
 - **Enforced at upload now:** the file rules, the two attachment forms, the rig, the budgets and glTF validity. Every Shop upload is checked on the server, and so is every `validate_wearable` call.
-- **Specified, played as SDK releases enable them:** named clips with triggers (`PORTALS_wearable`), material animation, secondary motion (`VRMC_springBone`), particle emitters and trails. Upload validates them against the standard today. Each only plays in games and on surfaces running a Guardian SDK release that enables it (the [changelog](https://portals.to/documentation/web-games/guardian-avatars-changelog) names each one). Everywhere else the wearable shows in its rest pose.
+- **Specified, played as SDK releases enable them:** named clips with triggers (`PORTALS_wearable`), material animation, secondary motion (`VRMC_springBone`), particle emitters and trails. Upload validates them against the standard today. Each only plays in games and on surfaces running a Portals avatar SDK release that enables it (the [changelog](https://portals.to/documentation/web-games/guardian-avatars-changelog) names each one). Everywhere else the wearable shows in its rest pose.
 
 So author the static wearable first, and make it look right standing still (principle 4 of the standard). That is how it appears in thumbnails, to reduced-motion players, on distant avatars and in games pinned to older SDKs. Add motion only when you mean it, and never make it carry the look.
 
@@ -61,7 +61,7 @@ The upload checks these limits and the SDK enforces the same ones at runtime. `v
 | Emitters / live particles per emitter | 4 / 256 | 4 / 256 |
 | Trails | 2 | 2 |
 
-`type: "cosmetic"` is anything worn on the Guardian. `type: "avatar"` is a full avatar that replaces it. The type picks the budgets. The Shop render image is a PNG, JPEG or WebP of at most 5 MB.
+`type: "cosmetic"` is anything worn on the Portals avatar. `type: "avatar"` is a full avatar that replaces it. The type picks the budgets. The Shop render image is a PNG, JPEG or WebP of at most 5 MB.
 
 ## Rules that are easy to get wrong
 
@@ -88,5 +88,5 @@ The tools stop at the draft. Price, supply, sale dates, game gating, purchase li
 
 ## Related
 
-- Wearing items in a game, including trying a local wearable GLB on a Guardian: the `portals-guardian-avatars` skill (`registerCatalog` + `equip`).
+- Wearing items in a game, including trying a local wearable GLB on a Portals avatar: the `portals-avatars` skill (`registerCatalog` + `equip`).
 - The MCP workflow and authentication: the `portals-web-games` skill.

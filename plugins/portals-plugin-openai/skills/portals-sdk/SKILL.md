@@ -51,7 +51,7 @@ The host control is outside and above untrusted game code. Never try to hide, re
 - Selling in-game products for Coins — the one sanctioned way to grant a paid entitlement: the `portals-game-economy` skill.
 - Real-time multiplayer, text chat, and voice: the `portals-multiplayer-and-voice` skill.
 - Authoritative server-side game logic: the `portals-server-scripts` skill.
-- Player avatars in a Three.js game: the `portals-guardian-avatars` skill.
+- Player avatars in a Three.js game: the `portals-avatars` skill.
 
 ## Threaded WASM imports
 
