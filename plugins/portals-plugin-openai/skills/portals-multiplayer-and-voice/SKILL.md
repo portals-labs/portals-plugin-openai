@@ -93,6 +93,7 @@ A dev token lets a locally served build talk to the real multiplayer service. Mi
 
 ## Related
 
+- Emotes between players: the avatar SDK's `syncEmotes` (0.58.0) plays each player's emotes for everyone and trusts only the roster's `player.emotes` — the `portals-avatars` and `portals-emotes` skills.
 - Identity, saves, and leaderboards: the `portals-sdk` skill.
 - Lobbies, ready checks, authoritative countdowns, kicking: the `portals-server-scripts` skill.
 - Server-authoritative real-time simulation — shared physics, snapshots, prediction: the `portals-server-sim` skill.

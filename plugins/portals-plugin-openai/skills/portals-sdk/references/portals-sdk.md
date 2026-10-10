@@ -405,6 +405,17 @@ document.querySelector("#quit").addEventListener("click", () => {
 
 The current host decides how to close the game and restore player controls.
 
+## Follow the player's settings
+
+From SDK 1.22.0, `Portals.preferences` carries the player's Portals settings. Today that is `emoteSounds`: whether they hear everyone's emote sounds (`"on"`), only their own (`"others-off"`), or none (`"off"`). The [Guardian avatar SDK](https://portals.to/documentation/web-games/guardian-avatars#props-and-sound) follows it for you; a game that plays emote sounds its own way reads it here:
+
+```js
+applyEmoteSounds(Portals.preferences.get().emoteSounds);
+Portals.preferences.on("change", (preferences) => applyEmoteSounds(preferences.emoteSounds));
+```
+
+Outside Portals, and until the host answers, `get()` returns the defaults.
+
 ## API reference
 
 | Method                                                | Result                                                                  |
@@ -422,6 +433,8 @@ The current host decides how to close the game and restore player controls.
 | `Portals.submitScore(score, mode?, options?)`         | Records a casual score; keeps the best for the mode's ranking unless `{ replace: true }`. A signed-out player needs `{ name }`. |
 | `Portals.getLeaderboard(options?)`                    | Reads up to 100 top casual scores. `{ board }` reads a private board.   |
 | `Portals.track(name, props?)`                         | Records an analytics event for the game's Analytics tab.                |
+| `Portals.preferences.get()`                           | Reads the player's Portals settings, such as `emoteSounds`.             |
+| `Portals.preferences.on("change", handler)`           | Follows the player's settings while the game runs; `off` stops.         |
 | `Portals.economy.getCatalog()`                        | Reads products frozen into the current release.                         |
 | `Portals.economy.getInventory()`                      | Reads this player's game-specific entitlements.                         |
 | `Portals.economy.purchase(sku)`                       | Opens Portals-owned Coin confirmation from a player action.             |
