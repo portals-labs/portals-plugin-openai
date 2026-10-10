@@ -89,4 +89,5 @@ The tools stop at the draft. Price, supply, sale dates, game gating, purchase li
 ## Related
 
 - Wearing items in a game, including trying a local wearable GLB on a Portals avatar: the `portals-avatars` skill (`registerCatalog` + `equip`).
+- Emotes, which a wearable's `emote` trigger plays along with: the `portals-emotes` skill.
 - The MCP workflow and authentication: the `portals-web-games` skill.

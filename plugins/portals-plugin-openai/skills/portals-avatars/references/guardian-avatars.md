@@ -512,6 +512,80 @@ avatars.removeNPC(npc);
 
 Locomotion (idle/walk/run selection, stride matching) is automatic while moving. Gotchas: NPCs keep their spawn height unless you pass `getGroundHeight` (per NPC or SDK-wide via `PortalsAvatarsOptions.npcDefaults`); `playAnimation` of a looping clip owns the body until `stopAnimation()` — for gestures during movement use `npc.avatar.animations.playOverlay()`; NPCs collide with the player and each other by default (0.32.0) — `collideWithAvatars: false` for a walk-through ghost; everything else an avatar can do is on `npc.avatar`.
 
+## Emotes
+
+From SDK 0.57.0 every player has an emote wheel, and games need no code to offer it. `createAvatarFromPlayer()` loads the player's wheel into `avatar.emotes`; a guest, or an avatar you build yourself, gets the starter set every player has (wave, clap, shrug, dance, celebrate).
+
+The character controller draws the default wheel. B opens it, a touch button opens it on phones, the slot numbers pick while it is open, and a pick plays on the player's avatar. Moving, jumping, crouching, using an item or leaving the ground cancels an emote. In first person the camera pulls back to third person for the emote and returns afterwards.
+
+```js
+const controller = avatars.createController(avatar, { camera, domElement: renderer.domElement });
+
+controller.setEmotesEnabled(false);   // off during a round…
+controller.setEmotesEnabled(true);    // …on again in your lobby
+```
+
+Pass `emotes: false` to `createController` for a game with no emotes at all. A game with its own emote UI keeps the rules and drops the wheel's key:
+
+```js
+const controller = avatars.createController(avatar, { camera, domElement, emotes: { key: null } });
+myButton.onclick = () => controller.playEmote(0);   // by wheel slot, or by key
+avatar.emotes.list();                               // the wheel: one entry (or null) per slot
+```
+
+The wheel opens over the middle of the game's view. Where the avatars are only part of the page, pass `emotes: { anchor: element }`: it opens centred over that element, moving only as far as keeps it wholly in view.
+
+`avatar.emotes` plays on any avatar, including one the controller does not own — a remote player, or an NPC:
+
+```js
+await remoteAvatar.emotes.play(emoteDef);                 // an entry from that player's wheel
+await remoteAvatar.emotes.play(emoteDef, { elapsed: 2 }); // one that started 2 s ago
+remoteAvatar.emotes.stop();
+remoteAvatar.emotes.on('end', (playback, reason) => { /* 'finished' | 'stopped' | 'replaced' */ });
+```
+
+### Emotes in multiplayer
+
+From SDK 0.58.0 one call keeps every player's emotes in step over [`Portals.net`](https://portals.to/documentation/web-games/multiplayer-and-voice):
+
+```js
+await Portals.net.join();
+const sync = syncEmotes({
+  net: Portals.net,
+  local: avatar,                          // the player's own avatar
+  avatarFor: (id) => remoteAvatars.get(id), // your avatar for another player
+});
+// on leave: sync.dispose(); after rebuilding the player's avatar: sync.setLocal(newAvatar)
+```
+
+Each player's emotes play on their avatar for everyone else, and a looping one is announced again every few seconds so a player who joins mid-dance sees it. A player can only show emotes Portals vouched for when they joined — `player.emotes` on the roster — so a peer's message cannot make anyone appear to own an emote they do not have. Messages it sends carry `$portals: "portals:emote"`; your own message handler can ignore them.
+
+An emote plays as a full-body layer over whatever the avatar is doing, so your own clips for a remote player do not have to stop for it to show. One that declares `feet: "planted"` (every starter emote that moves the legs does) keeps each foot where it stood when it began, whatever idle it plays over. A file plays alike on either body: its keys turn each body's own joints the same way, and where its hands meet on the rig it was authored on, as in a clap, they meet on both. A wearable bound to the `emote` trigger of the [wearable standard](https://portals.to/documentation/web-games/wearable-standard) plays along. Emote files follow the [emote standard](https://portals.to/documentation/web-games/emote-standard); one that does not is skipped.
+
+### Props and sound
+
+From SDK 0.59.0 an emote can carry a prop — a flag, a microphone, a guitar — and a sound, and both play with no game code. The prop rides on its bone only while the emote plays. The sound starts with the emote's main clip: it loops with a looping emote and ends when the loop does, and a one-shot's plays through.
+
+Every emote sound plays through `avatars.audio`. The SDK measures each sound on the player's device and plays it at the same loudness (-16 LUFS), so no file can be louder than another. Other players' sounds come from where they stand, at half the volume of the player's own, and only the nearest three are heard at once. The player's Portals setting (everyone's sounds, only their own, or none) and Portals voice chat, which ducks emote sounds while someone else talks, are followed for you. Your game sets the level:
+
+```js
+avatars.audio.setVolume(settings.sfxVolume);       // 0–1: your game's own volume control
+avatars.audio.setRemoteVolume(0.3);                // others' emotes relative to the player's own
+avatars.audio.setMuted(paused);                    // silent while paused; each sound resumes where its emote is
+```
+
+Emote sounds go silent on their own while the page is hidden, and come back where their emotes are when it shows again.
+
+A game with its own mixer passes its context and master bus, so its mute and volume apply to emote sounds as well:
+
+```js
+const avatars = new PortalsAvatars({ scene, audio: { context: audioContext, destination: masterGain } });
+```
+
+`createController()` hears from its camera. A game that renders from another camera, or has no controller, sets the listener itself with `avatars.audio.setListener(camera)`.
+
+Props share one budget across every avatar: the player's own first, then everyone else by distance. Past it, an avatar's emote plays without its prop. The default is 80,000 triangles in 64 draw calls, eight props at the standard's limit, or thirty-two small ones; set `emotePropBudget` to change it. `avatars.getEmoteStats()` shows what props and sounds cost in a frame.
+
 ## Cleanup
 
 `avatars.removeAvatar(avatar)` disposes the avatar, its GPU resources and its controllers. `avatars.removeNPC(npc)` does the same for an NPC. `avatars.dispose()` does the lot — call it when leaving a scene.

@@ -77,7 +77,7 @@ net.on("playerjoin", (player, players) => renderRoster(players));
 net.on("playerleave", (player, players) => renderRoster(players));
 ```
 
-Each player is `{ id, playerId, displayName, avatarUrl }`. `id` identifies the connection (two tabs are two players); `playerId` is the game-scoped identity from the Portals SDK and is `null` for signed-out players, so always render a fallback name.
+Each player is `{ id, playerId, displayName, avatarUrl }`, plus `emotes` — the emote wheel Portals vouched for when they joined, which the avatar SDK's [`syncEmotes`](https://portals.to/documentation/web-games/guardian-avatars#emotes-in-multiplayer) trusts instead of peers' messages. `id` identifies the connection (two tabs are two players); `playerId` is the game-scoped identity from the Portals SDK and is `null` for signed-out players, so always render a fallback name.
 
 ## Design for party members who join late
 

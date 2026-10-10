@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portals Shop Emotes"
+  short_description: "Make, check and submit emotes for the Portals Shop"
+  default_prompt: "Use $portals-emotes to make an emote for the Portals Shop and submit it for review."

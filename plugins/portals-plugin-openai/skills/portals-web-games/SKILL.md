@@ -1,6 +1,6 @@
 ---
 name: portals-web-games
-description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards and host UI safe areas, Portals.economy Coin microtransactions and product catalogs, Portals.net multiplayer, Portals.voice, Portals avatars, Shop wearable drafts, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
+description: Build, update, synchronize, configure, and publish browser games on Portals with the portals-web-games MCP server. Use for Portals game projects, portals.to/my-games, pushing or pulling game source, Portals SDK identity/saves/leaderboards and host UI safe areas, Portals.economy Coin microtransactions and product catalogs, Portals.net multiplayer, Portals.voice, Portals avatars, Shop wearable and emote drafts, local multiplayer tokens, and Portals AI Lab image, texture, 3D, speech, sound, or music assets.
 ---
 
 # Portals Web Games
@@ -20,6 +20,7 @@ For the full official documentation on one subsystem, use the dedicated skill in
 - `portals-avatars` — Portals avatars, wearables, animation, and the character controller in Three.js.
 - `portals-game-economy` — selling in-game products for Coins: the product catalog, `Portals.economy` purchases, and the purchase sandbox.
 - `portals-wearables` — making Portals avatar wearables for the Portals Shop: the wearable standard, the rig, budgets, and checking, drafting and submitting them with `validate_wearable`, `create_wearable_draft`, `update_wearable_draft` and `submit_wearable_draft`.
+- `portals-emotes` — making emotes for the Portals Shop and playing them in games: the emote standard, limits, where the motion comes from, and checking, drafting and submitting them with `validate_emote`, `create_emote_draft`, `update_emote_draft` and `submit_emote_draft`.
 
 ## Choose the workflow
 
