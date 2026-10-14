@@ -3,7 +3,7 @@
 Build, manage, and publish [Portals](https://portals.to/) browser games from Codex —
 the `portals-web-games` MCP server plus skills carrying the platform documentation.
 
-Current version: **0.1.28**
+Current version: **0.1.29**
 
 ## Install
 

@@ -31593,6 +31593,12 @@ async function getWebGameSettings(gameId) {
   );
   return toWebGameSettingsSummary(game);
 }
+async function connectTikTokAnalyticsApp(gameId, clientKey, clientSecret) {
+  await arcadeRequest("/api/v2/arcade/analytics/tiktok-app", {
+    method: "POST",
+    body: { gameId, clientKey, clientSecret }
+  });
+}
 var PRIVATE_LEADERBOARD_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 async function createPrivateLeaderboard(gameId, board) {
   return arcadeRequest("/api/v2/arcade/leaderboard-boards", {
@@ -31655,8 +31661,8 @@ async function saveWebGameChangelogDraft(input) {
 
 // src/tools.ts
 var import_node_crypto3 = require("node:crypto");
-var import_promises4 = require("node:fs/promises");
-var import_node_path5 = require("node:path");
+var import_promises5 = require("node:fs/promises");
+var import_node_path6 = require("node:path");
 
 // src/auth.ts
 var import_node_http = require("node:http");
@@ -32000,9 +32006,100 @@ function clearCredentials() {
   }
 }
 
-// src/web-game-bundle.ts
+// src/tiktok-analytics.ts
 var import_promises = require("node:fs/promises");
 var import_node_path2 = require("node:path");
+var TIKTOK_CONFIG_NAME = "tiktok-native.config.json";
+var CLIENT_KEY_RE = /^[A-Za-z0-9_-]{1,128}$/;
+var CLIENT_SECRET_RE = /^[A-Za-z0-9_-]{8,256}$/;
+var TikTokProjectError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+  code;
+};
+async function readJson(path, missing) {
+  let text;
+  try {
+    text = await (0, import_promises.readFile)(path, "utf8");
+  } catch {
+    throw missing;
+  }
+  try {
+    return { text, value: JSON.parse(text) };
+  } catch {
+    throw new TikTokProjectError("INVALID_JSON", `${path} is not valid JSON.`);
+  }
+}
+async function readTikTokProject(directory) {
+  const root = (0, import_node_path2.resolve)(directory);
+  const configPath = (0, import_node_path2.join)(root, TIKTOK_CONFIG_NAME);
+  const config2 = await readJson(
+    configPath,
+    new TikTokProjectError(
+      "TIKTOK_CONFIG_NOT_FOUND",
+      `${configPath} not found \u2014 run \`tiktok-native-pack init\` in the game's directory first.`
+    )
+  );
+  const named = typeof config2.value?.credentials === "string" ? config2.value.credentials : "tiktok.config.json";
+  const credentialsPath = (0, import_node_path2.isAbsolute)(named) ? named : (0, import_node_path2.join)(root, named);
+  const credentials = await readJson(
+    credentialsPath,
+    new TikTokProjectError(
+      "TIKTOK_CREDENTIALS_NOT_FOUND",
+      `${credentialsPath} not found \u2014 create it with the TikTok app's appid, clientKey and clientSecret.`
+    )
+  );
+  const { clientKey, clientSecret } = credentials.value ?? {};
+  if (typeof clientKey !== "string" || !CLIENT_KEY_RE.test(clientKey)) {
+    throw new TikTokProjectError(
+      "TIKTOK_CLIENT_KEY_MISSING",
+      `${credentialsPath} has no valid clientKey (TikTok Developer Portal \u2192 your mini game app \u2192 Credentials).`
+    );
+  }
+  if (typeof clientSecret !== "string" || !CLIENT_SECRET_RE.test(clientSecret)) {
+    throw new TikTokProjectError(
+      "TIKTOK_CLIENT_SECRET_MISSING",
+      `${credentialsPath} has no valid clientSecret. Copy the Client secret from TikTok Developer Portal \u2192 your mini game app \u2192 Credentials into it as "clientSecret".`
+    );
+  }
+  return { configPath, configText: config2.text, credentialsPath, clientKey, clientSecret };
+}
+var inline = (value) => `{ ${Object.entries(value).map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(", ")} }`;
+function setPortalsGameId(configText, gameId) {
+  const parsed = JSON.parse(configText);
+  const portals = { ...parsed.portals && typeof parsed.portals === "object" ? parsed.portals : {}, gameId };
+  let next;
+  const existing = /"portals"\s*:\s*\{[^{}]*\}/;
+  if (parsed.portals !== void 0) {
+    next = existing.test(configText) ? configText.replace(existing, () => `"portals": ${inline(portals)}`) : "";
+  } else {
+    const indent = configText.match(/\{\s*\n([ \t]+)"/)?.[1] ?? "  ";
+    const empty = Object.keys(parsed).length === 0;
+    next = configText.replace(/\{/, () => `{
+${indent}"portals": ${inline(portals)}${empty ? "\n" : ","}`);
+  }
+  try {
+    const check2 = JSON.parse(next);
+    if (check2.portals?.gameId === gameId && Object.keys(check2).length === Object.keys({ ...parsed, portals }).length) {
+      return next;
+    }
+  } catch {
+  }
+  return `${JSON.stringify({ ...parsed, portals }, null, 2)}
+`;
+}
+async function writePortalsGameId(project, gameId) {
+  const next = setPortalsGameId(project.configText, gameId);
+  if (next === project.configText) return false;
+  await (0, import_promises.writeFile)(project.configPath, next);
+  return true;
+}
+
+// src/web-game-bundle.ts
+var import_promises2 = require("node:fs/promises");
+var import_node_path3 = require("node:path");
 var import_node_zlib = require("node:zlib");
 var MAX_BUNDLE_FILES = 500;
 var MAX_BUNDLE_BYTES = 100 * 1024 * 1024;
@@ -32057,8 +32154,8 @@ function assetPathProblem(assetPath) {
 function resolveBundleTarget(root, assetPath) {
   const problem = assetPathProblem(assetPath);
   if (problem) throw new Error(`${assetPath}: ${problem}`);
-  const target = (0, import_node_path2.resolve)(root, assetPath);
-  const boundary = root.endsWith(import_node_path2.sep) ? root : `${root}${import_node_path2.sep}`;
+  const target = (0, import_node_path3.resolve)(root, assetPath);
+  const boundary = root.endsWith(import_node_path3.sep) ? root : `${root}${import_node_path3.sep}`;
   if (!target.startsWith(boundary)) {
     throw new Error(`${assetPath}: resolves outside the target directory`);
   }
@@ -32074,7 +32171,7 @@ async function inspectBundleSource(files) {
     if (!CODE_EXTENSIONS.test(file2.assetPath) || file2.bytes > MAX_DETECT_SOURCE_BYTES) {
       continue;
     }
-    const source = await (0, import_promises.readFile)(file2.absolutePath, "utf8");
+    const source = await (0, import_promises2.readFile)(file2.absolutePath, "utf8");
     if (/\bPortals\s*\.\s*net\b/.test(source)) usesMultiplayer = true;
     if (DEV_TOKEN_LITERAL.test(source)) devTokenPaths.push(file2.assetPath);
   }
@@ -32086,10 +32183,10 @@ async function scanWebGameDirectory(rootDir) {
   const errors = [];
   let totalBytes = 0;
   async function walk(dir) {
-    const entries = await (0, import_promises.readdir)(dir, { withFileTypes: true });
+    const entries = await (0, import_promises2.readdir)(dir, { withFileTypes: true });
     for (const entry of entries) {
-      const absolutePath = (0, import_node_path2.join)(dir, entry.name);
-      const assetPath = (0, import_node_path2.relative)(rootDir, absolutePath).split(import_node_path2.sep).join("/");
+      const absolutePath = (0, import_node_path3.join)(dir, entry.name);
+      const assetPath = (0, import_node_path3.relative)(rootDir, absolutePath).split(import_node_path3.sep).join("/");
       if (entry.isDirectory()) {
         if (SKIPPED_DIRECTORIES.has(entry.name) || MANAGED_PATHS.has(assetPath)) {
           skipped.push(`${assetPath}/`);
@@ -32111,7 +32208,7 @@ async function scanWebGameDirectory(rootDir) {
         errors.push(`${assetPath}: ${problem}`);
         continue;
       }
-      const info = await (0, import_promises.stat)(absolutePath);
+      const info = await (0, import_promises2.stat)(absolutePath);
       if (info.size > MAX_FILE_BYTES) {
         errors.push(
           `${assetPath}: ${info.size} bytes exceeds the per-file limit of ${MAX_FILE_BYTES}`
@@ -32175,7 +32272,7 @@ async function createZipArchive(files) {
   const centralParts = [];
   let offset = 0;
   for (const file2 of files) {
-    const contents = await (0, import_promises.readFile)(file2.absolutePath);
+    const contents = await (0, import_promises2.readFile)(file2.absolutePath);
     const deflated = (0, import_node_zlib.deflateRawSync)(contents, { level: 9 });
     const stored = deflated.length >= contents.length;
     const payload = stored ? contents : deflated;
@@ -32587,8 +32684,8 @@ async function listOwnedMarketplaceItems() {
 }
 
 // src/generated-asset.ts
-var import_promises2 = require("node:fs/promises");
-var import_node_path3 = require("node:path");
+var import_promises3 = require("node:fs/promises");
+var import_node_path4 = require("node:path");
 var PORTALS_ASSET_HOSTS = /* @__PURE__ */ new Set([
   "cdn.theportal.to",
   "d365bxku1h71bo.cloudfront.net",
@@ -32625,7 +32722,7 @@ function extensionFromUrl(rawUrl) {
   } catch {
     pathname = rawUrl;
   }
-  return (0, import_node_path3.extname)(pathname).toLowerCase();
+  return (0, import_node_path4.extname)(pathname).toLowerCase();
 }
 function slugifyForFilename(text, maxLength = 40) {
   const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, maxLength).replace(/-+$/g, "");
@@ -32638,8 +32735,8 @@ async function resolveGeneratedAssetTarget(options) {
   }
   const urlExtension = options.sourceUrl ? extensionFromUrl(options.sourceUrl) : "";
   const extension = urlExtension || options.fallbackExtension || "";
-  const absoluteGiven = (0, import_node_path3.isAbsolute)(given) ? given : (0, import_node_path3.resolve)(process.cwd(), given);
-  const looksLikeDirectory = given.endsWith("/") || given.endsWith(import_node_path3.sep) || await isDirectory(absoluteGiven);
+  const absoluteGiven = (0, import_node_path4.isAbsolute)(given) ? given : (0, import_node_path4.resolve)(process.cwd(), given);
+  const looksLikeDirectory = given.endsWith("/") || given.endsWith(import_node_path4.sep) || await isDirectory(absoluteGiven);
   let absolutePath;
   if (looksLikeDirectory) {
     if (!extension) {
@@ -32648,12 +32745,12 @@ async function resolveGeneratedAssetTarget(options) {
       );
     }
     const stem = options.suggestedName.replace(/\.[A-Za-z0-9]{1,5}$/, "");
-    absolutePath = (0, import_node_path3.resolve)(absoluteGiven, `${slugifyForFilename(stem)}${extension}`);
+    absolutePath = (0, import_node_path4.resolve)(absoluteGiven, `${slugifyForFilename(stem)}${extension}`);
   } else {
-    const hasExtension = (0, import_node_path3.extname)(absoluteGiven) !== "";
+    const hasExtension = (0, import_node_path4.extname)(absoluteGiven) !== "";
     absolutePath = hasExtension ? absoluteGiven : `${absoluteGiven}${extension}`;
   }
-  const name = (0, import_node_path3.basename)(absolutePath);
+  const name = (0, import_node_path4.basename)(absolutePath);
   if (!name) {
     throw new Error(`${given} does not name a file.`);
   }
@@ -32663,7 +32760,7 @@ async function resolveGeneratedAssetTarget(options) {
       `"${name}" cannot be published in a web bundle: ${problem}. Pick a name of letters, digits, ".", "_" and "-".`
     );
   }
-  const finalExtension = (0, import_node_path3.extname)(absolutePath).toLowerCase();
+  const finalExtension = (0, import_node_path4.extname)(absolutePath).toLowerCase();
   if (!GENERATED_EXTENSIONS.has(finalExtension)) {
     throw new Error(
       `"${name}" has an unexpected file type for a generated asset \u2014 use ${[...GENERATED_EXTENSIONS].join(", ")}.`
@@ -32672,13 +32769,13 @@ async function resolveGeneratedAssetTarget(options) {
   return { absolutePath, displayPath: given };
 }
 async function isDirectory(path) {
-  const info = await (0, import_promises2.stat)(path).catch(() => null);
+  const info = await (0, import_promises3.stat)(path).catch(() => null);
   return info?.isDirectory() === true;
 }
 async function saveGeneratedAsset(sourceUrl, target, options = {}) {
   assertPortalsAssetUrl(sourceUrl);
   if (options.overwrite !== true) {
-    const existing = await (0, import_promises2.stat)(target.absolutePath).catch(() => null);
+    const existing = await (0, import_promises3.stat)(target.absolutePath).catch(() => null);
     if (existing) {
       throw new Error(
         `${target.absolutePath} already exists. Pass overwrite=true to replace it, or name a different file.`
@@ -32691,8 +32788,8 @@ async function saveGeneratedAsset(sourceUrl, target, options = {}) {
       `The generated asset is ${bytes.length} bytes, over the ${MAX_FILE_BYTES} byte per-file limit for a web bundle.`
     );
   }
-  await (0, import_promises2.mkdir)((0, import_node_path3.dirname)(target.absolutePath), { recursive: true });
-  await (0, import_promises2.writeFile)(target.absolutePath, bytes);
+  await (0, import_promises3.mkdir)((0, import_node_path4.dirname)(target.absolutePath), { recursive: true });
+  await (0, import_promises3.writeFile)(target.absolutePath, bytes);
   return { absolutePath: target.absolutePath, bytes: bytes.length, sourceUrl };
 }
 var DEFAULT_WAIT_SECONDS = 45;
@@ -32804,8 +32901,8 @@ function findAvatarItem(wardrobe, itemId) {
 
 // src/shop-draft-client.ts
 var import_node_crypto2 = require("node:crypto");
-var import_promises3 = require("node:fs/promises");
-var import_node_path4 = require("node:path");
+var import_promises4 = require("node:fs/promises");
+var import_node_path5 = require("node:path");
 var ShopDraftApiError = class extends Error {
   constructor(path, status, code, payload) {
     const message = typeof payload.message === "string" ? payload.message : "";
@@ -32881,14 +32978,14 @@ var WRONG_TYPE = {
   audio: (path) => `${path} is not an MP3. Export the sound as an MP3.`
 };
 async function uploadLocalShopFile(localPath, kind, options) {
-  const absolutePath = (0, import_node_path4.resolve)(localPath);
-  const type = CONTENT_TYPES[(0, import_node_path4.extname)(absolutePath).toLowerCase()];
+  const absolutePath = (0, import_node_path5.resolve)(localPath);
+  const type = CONTENT_TYPES[(0, import_node_path5.extname)(absolutePath).toLowerCase()];
   if (!type || type.kind !== kind) {
     throw new ShopDraftFileError("UNSUPPORTED_FILE", WRONG_TYPE[kind](localPath, options.glbAdvice));
   }
   let size;
   try {
-    const info = await (0, import_promises3.stat)(absolutePath);
+    const info = await (0, import_promises4.stat)(absolutePath);
     if (!info.isFile()) throw new Error("not a file");
     size = info.size;
   } catch {
@@ -32906,7 +33003,7 @@ async function uploadLocalShopFile(localPath, kind, options) {
     method: "POST",
     body: { kind, fileType: type.contentType, fileSize: size }
   });
-  await uploadGrantBytes(grant, await (0, import_promises3.readFile)(absolutePath), (0, import_node_path4.basename)(absolutePath));
+  await uploadGrantBytes(grant, await (0, import_promises4.readFile)(absolutePath), (0, import_node_path5.basename)(absolutePath));
   return { localPath: absolutePath, assetUrl: grant.assetUrl, bytes: size, contentType: grant.contentType };
 }
 function toShopDraft(data) {
@@ -33326,8 +33423,8 @@ function registerTools(server2) {
             ["Call list_web_games to find an existing gameId, or pass a title to create a project."]
           );
         }
-        const root = (0, import_node_path5.resolve)(directory.trim());
-        const rootInfo = await (0, import_promises4.stat)(root).catch(() => null);
+        const root = (0, import_node_path6.resolve)(directory.trim());
+        const rootInfo = await (0, import_promises5.stat)(root).catch(() => null);
         if (!rootInfo?.isDirectory()) {
           return errorResult(
             "push_web_game_source",
@@ -33488,8 +33585,8 @@ function registerTools(server2) {
             ["Pass the directory to write the project into."]
           );
         }
-        const root = (0, import_node_path5.resolve)(directory.trim());
-        const existing = await (0, import_promises4.stat)(root).catch(() => null);
+        const root = (0, import_node_path6.resolve)(directory.trim());
+        const existing = await (0, import_promises5.stat)(root).catch(() => null);
         if (existing && !existing.isDirectory()) {
           return errorResult(
             "pull_web_game_source",
@@ -33500,7 +33597,7 @@ function registerTools(server2) {
           );
         }
         if (existing && overwrite !== true) {
-          const entries = await (0, import_promises4.readdir)(root);
+          const entries = await (0, import_promises5.readdir)(root);
           if (entries.length > 0) {
             return errorResult(
               "pull_web_game_source",
@@ -33527,8 +33624,8 @@ function registerTools(server2) {
             while (next < targets.length) {
               const target = targets[next++];
               const contents = await fetchProjectFile(target.url, target.path);
-              await (0, import_promises4.mkdir)((0, import_node_path5.join)(target.absolutePath, ".."), { recursive: true });
-              await (0, import_promises4.writeFile)(target.absolutePath, contents);
+              await (0, import_promises5.mkdir)((0, import_node_path6.join)(target.absolutePath, ".."), { recursive: true });
+              await (0, import_promises5.writeFile)(target.absolutePath, contents);
             }
           })
         );
@@ -33715,8 +33812,8 @@ function registerTools(server2) {
     ".webm": { contentType: "video/webm", mediaType: "video" }
   };
   async function stageListingMedia(gameId, filePath, purpose) {
-    const resolved = (0, import_node_path5.resolve)(filePath.trim());
-    const media = MEDIA_CONTENT_TYPES[(0, import_node_path5.extname)(resolved).toLowerCase()];
+    const resolved = (0, import_node_path6.resolve)(filePath.trim());
+    const media = MEDIA_CONTENT_TYPES[(0, import_node_path6.extname)(resolved).toLowerCase()];
     if (!media) {
       throw new Error(
         `${resolved}: unsupported media type \u2014 use .jpg/.jpeg/.png/.webp${purpose === "gallery" ? "/.mp4/.webm" : ""}.`
@@ -33725,11 +33822,11 @@ function registerTools(server2) {
     if (purpose === "thumbnail" && media.mediaType !== "image") {
       throw new Error(`${resolved}: the featured image must be a JPEG, PNG, or WebP image.`);
     }
-    const info = await (0, import_promises4.stat)(resolved).catch(() => null);
+    const info = await (0, import_promises5.stat)(resolved).catch(() => null);
     if (!info?.isFile()) {
       throw new Error(`${resolved} is not an existing file.`);
     }
-    const bytes = await (0, import_promises4.readFile)(resolved);
+    const bytes = await (0, import_promises5.readFile)(resolved);
     const grant = await createMediaUploadUrl(gameId, media.contentType, bytes.length, purpose);
     await uploadMediaFile(grant, bytes);
     return grant;
@@ -34033,6 +34130,72 @@ function registerTools(server2) {
     }
   );
   server2.registerTool(
+    "connect_tiktok_analytics",
+    {
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: true,
+        destructiveHint: false
+      },
+      description: `Turn on Portals analytics for the TikTok mini game build of a web game packaged with tiktok-native-pack, so its Portals.track events and play sessions show up on the game's Analytics tab (tagged platform "tiktok"). Point it at the directory holding tiktok-native.config.json. It reads the TikTok app's clientKey and clientSecret from the credentials file (tiktok.config.json), has Portals check them with TikTok and store the secret encrypted, then writes portals.gameId into tiktok-native.config.json. The game's code needs no change. Run it once per TikTok app; running it again replaces the stored secret.`,
+      inputSchema: {
+        gameId: external_exports.string().describe("Web game whose analytics the TikTok build reports to (from list_web_games)."),
+        directory: external_exports.string().describe("The game's directory with tiktok-native.config.json (where `tiktok-native-pack build` runs).")
+      }
+    },
+    async ({ gameId: rawGameId, directory }) => {
+      const gameId = rawGameId?.trim();
+      try {
+        if (!gameId) {
+          return errorResult(
+            "connect_tiktok_analytics",
+            "GAME_ID_REQUIRED",
+            "gameId is required.",
+            "Nothing was connected.",
+            ["Call list_web_games to find the gameId."]
+          );
+        }
+        const project = await readTikTokProject(directory);
+        await connectTikTokAnalyticsApp(gameId, project.clientKey, project.clientSecret);
+        const wrote = await writePortalsGameId(project, gameId);
+        return successResult(
+          "connect_tiktok_analytics",
+          `Connected TikTok app ${project.clientKey} to web game ${gameId}${wrote ? ` and set portals.gameId in ${project.configPath}` : ""}.`,
+          { game_id: gameId, client_key: project.clientKey, config_path: project.configPath, config_updated: wrote },
+          [
+            "Rebuild the TikTok package (`tiktok-native-pack build`, or the game's own TikTok build script) and upload it \u2014 the build bakes in portals.gameId.",
+            "In TikTok's Developer Portal, add https://portals.to to the app's request domains; without it TikTok blocks the analytics requests.",
+            'Analytics only records while the game is published (live) on Portals. Sessions appear on the Analytics tab with platform "tiktok"; ask the analytics chat for "players by platform".'
+          ]
+        );
+      } catch (error51) {
+        if (error51 instanceof TikTokProjectError) {
+          return errorResult(
+            "connect_tiktok_analytics",
+            error51.code,
+            error51.message,
+            "Nothing was connected.",
+            ["Fix the file named in the message and run connect_tiktok_analytics again."],
+            { game_id: gameId, directory }
+          );
+        }
+        return errorResult(
+          "connect_tiktok_analytics",
+          "CONNECT_TIKTOK_ANALYTICS_FAILED",
+          toErrorMessage(error51),
+          "The TikTok app was not connected; tiktok-native.config.json is unchanged.",
+          [
+            "On TIKTOK_CREDENTIALS_INVALID, TikTok refused the clientKey/clientSecret pair \u2014 copy both again from TikTok Developer Portal \u2192 your mini game app \u2192 Credentials.",
+            "On TIKTOK_UNAVAILABLE, TikTok could not be reached or did not answer \u2014 retry in a minute.",
+            "On FORBIDDEN or NOT_FOUND, this account does not own or administer that game \u2014 check the gameId with list_web_games.",
+            "On TIKTOK_ANALYTICS_NOT_CONFIGURED, Portals is not set up for TikTok analytics yet \u2014 contact Portals support."
+          ],
+          { game_id: gameId, directory }
+        );
+      }
+    }
+  );
+  server2.registerTool(
     "create_dev_multiplayer_token",
     {
       annotations: {
@@ -34073,8 +34236,8 @@ function registerTools(server2) {
         let sdkPresent = null;
         let resolvedDirectory = null;
         if (directory?.trim()) {
-          resolvedDirectory = (0, import_node_path5.resolve)(directory.trim());
-          const info = await (0, import_promises4.stat)((0, import_node_path5.join)(resolvedDirectory, "_portals", "sdk.js")).catch(() => null);
+          resolvedDirectory = (0, import_node_path6.resolve)(directory.trim());
+          const info = await (0, import_promises5.stat)((0, import_node_path6.join)(resolvedDirectory, "_portals", "sdk.js")).catch(() => null);
           sdkPresent = info?.isFile() === true;
         }
         const sdkDownloadCommand = `mkdir -p _portals && curl -o _portals/sdk.js ${sdkUrl()}`;
@@ -34577,8 +34740,8 @@ ${htmlSnippet}`,
         const reference = image.trim();
         let imageUrl = reference;
         if (!/^https?:\/\//i.test(reference) && !reference.startsWith("data:")) {
-          const resolved = (0, import_node_path5.resolve)(reference);
-          const contentType = REFERENCE_IMAGE_TYPES[(0, import_node_path5.extname)(resolved).toLowerCase()];
+          const resolved = (0, import_node_path6.resolve)(reference);
+          const contentType = REFERENCE_IMAGE_TYPES[(0, import_node_path6.extname)(resolved).toLowerCase()];
           if (!contentType) {
             return errorResult(
               "image_to_3d_model",
@@ -34588,7 +34751,7 @@ ${htmlSnippet}`,
               ["Convert the reference to a JPEG, PNG, or WebP."]
             );
           }
-          const info = await (0, import_promises4.stat)(resolved).catch(() => null);
+          const info = await (0, import_promises5.stat)(resolved).catch(() => null);
           if (!info?.isFile()) {
             return errorResult(
               "image_to_3d_model",
@@ -34607,7 +34770,7 @@ ${htmlSnippet}`,
               ["Downscale the reference image \u2014 a 1024px view is plenty."]
             );
           }
-          const bytes = await (0, import_promises4.readFile)(resolved);
+          const bytes = await (0, import_promises5.readFile)(resolved);
           imageUrl = `data:${contentType};base64,${bytes.toString("base64")}`;
         }
         const taskId = await startImageToModel({
