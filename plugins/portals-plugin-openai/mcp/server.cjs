@@ -31534,7 +31534,8 @@ function toWebGameSettingsSummary(game) {
     priceCents: game.priceCents ?? null,
     featuredLeaderboardMode: game.featuredLeaderboardMode ?? null,
     thumbnailUrl: game.thumbnailUrl ?? null,
-    gallery: Array.isArray(game.gallery) ? game.gallery : []
+    gallery: Array.isArray(game.gallery) ? game.gallery : [],
+    remixable: typeof game.remixable === "boolean" ? game.remixable : null
   };
 }
 async function updateWebGameSettings(gameId, settings, stagedMediaPaths = []) {
@@ -33288,7 +33289,8 @@ function registerTools(server2) {
       price_cents: game.priceCents,
       featured_leaderboard_mode: game.featuredLeaderboardMode,
       thumbnail_url: game.thumbnailUrl,
-      gallery: game.gallery
+      gallery: game.gallery,
+      remixable: game.remixable
     };
   }
   server2.registerTool(
@@ -33839,7 +33841,7 @@ function registerTools(server2) {
         openWorldHint: true,
         destructiveHint: true
       },
-      description: "Update a web game's properties: title, description, overview, canonical link (slug), featured image, gallery, genre and subgenres, device support, age rating, player support (singleplayer or multiplayer with max players and mode), featured leaderboard, and pricing. Only the fields passed change \u2014 everything else is left alone. The featured image and gallery take local file paths and are uploaded automatically. Slug and pricing are owner authority; pricing (access_mode/price_cents) takes effect when the game is next published, everything else applies to the game page immediately. On a live game, metadata edits re-run the automated listing review. Matchmaking profiles (managed lobbies) and the latency-sensitive multiplayer toggle are not settable through this tool.",
+      description: "Update a web game's properties: title, description, overview, canonical link (slug), featured image, gallery, genre and subgenres, device support, age rating, player support (singleplayer or multiplayer with max players and mode), featured leaderboard, pricing, and remixing. Only the fields passed change \u2014 everything else is left alone. The featured image and gallery take local file paths and are uploaded automatically. Slug, pricing, and remixing are owner authority; pricing (access_mode/price_cents) takes effect when the game is next published, everything else applies to the game page immediately. On a live game, metadata edits re-run the automated listing review; the remixing setting does not. Matchmaking profiles (managed lobbies) and the latency-sensitive multiplayer toggle are not settable through this tool.",
       inputSchema: {
         gameId: external_exports.string().describe("Web game to update (from list_web_games)."),
         title: external_exports.string().optional().describe("Game name shown in My Games and on the game's page. 1\u201380 characters."),
@@ -33890,6 +33892,9 @@ function registerTools(server2) {
         multiplayerMode: external_exports.enum(["competitive", "coop"]).nullable().optional().describe("How players relate in a multiplayer game: competitive or coop. Required when multiplayer is true."),
         accessMode: external_exports.enum(["free", "paid"]).optional().describe("Whether players must buy the game. Owner-only; takes effect at the next publish."),
         priceCents: external_exports.number().int().nullable().optional().describe("Price in cents (100\u201399999999, i.e. $1.00\u2013$999,999.99) for paid games. Owner-only; takes effect at the next publish."),
+        remixable: external_exports.boolean().optional().describe(
+          "Whether players can remix the game: start their own project from its published release (never unpublished changes, pricing, listing media, leaderboards, or in-game economy). Paid games can be remixed only by players who bought them. On by default for new games; games created before remixing existed start off unless the Portals team published them. Owner-only; applies immediately, no republish, and existing remixes are not affected. Portals ThreeJS Engine games can't be remixed yet."
+        ),
         featuredLeaderboardMode: external_exports.string().nullable().optional().describe(
           "Score mode (from Portals.submitScore) to feature on the game's page. Must be a mode this game has actually received scores for. null turns the featured leaderboard off."
         )
@@ -33913,6 +33918,7 @@ function registerTools(server2) {
       multiplayerMode,
       accessMode,
       priceCents,
+      remixable,
       featuredLeaderboardMode
     }) => {
       try {
@@ -33957,6 +33963,7 @@ function registerTools(server2) {
           ...multiplayerMode !== void 0 ? { multiplayerMode } : {},
           ...accessMode !== void 0 ? { accessMode } : {},
           ...priceCents !== void 0 ? { priceCents } : {},
+          ...remixable !== void 0 ? { remixable } : {},
           ...featuredLeaderboardMode !== void 0 ? { featuredLeaderboardMode } : {},
           ...removeFeaturedImage === true ? { thumbnailUrl: null } : {}
         };
@@ -34021,7 +34028,7 @@ function registerTools(server2) {
           [
             ...slug !== void 0 && updated ? [`The game's link is now ${playUrl(updated.slug)}; previous links keep working as aliases.`] : [],
             ...accessMode !== void 0 || priceCents !== void 0 ? ["Pricing is stamped to the live game at publish \u2014 call publish_web_game for players to see it."] : [],
-            ...updated?.status === "live" ? ["Metadata edits on a live game re-run the automated listing review; the public listing may take a moment to reflect them."] : []
+            ...updated?.status === "live" && changedKeys.some((key) => key !== "remixable") ? ["Metadata edits on a live game re-run the automated listing review; the public listing may take a moment to reflect them."] : []
           ]
         );
       } catch (error51) {
